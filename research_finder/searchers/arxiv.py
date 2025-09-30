@@ -27,13 +27,20 @@ class ArxivSearcher(BaseSearcher):
 
             for entry in feed.entries:
                 authors = [author.name for author in entry.authors]
+                # UPDATED: Extract arXiv ID to use as DOI
+                arxiv_id = entry.id.split('/')[-1]
+                
                 paper = {
                     'Title': entry.title,
                     'Authors': ', '.join(authors),
                     'Year': entry.published.split('-')[0],
                     'Abstract': entry.summary,
                     'URL': entry.link,
-                    'Source': self.name
+                    'Source': self.name,
+                    'Citation': 'N/A',
+                    # ADDED: Use arXiv ID and set Venue
+                    'DOI': arxiv_id,
+                    'Venue': 'arXiv'
                 }
                 self.results.append(paper)
             self.logger.info(f"Found {len(self.results)} papers.")

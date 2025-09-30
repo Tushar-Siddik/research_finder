@@ -14,10 +14,11 @@ class SemanticScholarSearcher(BaseSearcher):
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         self.clear_results()
+        # UPDATED: Added 'doi' and 'venue' to fields
         params = {
             'query': query,
             'limit': limit,
-            'fields': 'title,authors,year,abstract,url,citationCount,tldr'
+            'fields': 'title,authors,year,abstract,url,citationCount,tldr,doi,venue'
         }
         try:
             response = requests.get(self.BASE_URL, params=params)
@@ -34,7 +35,12 @@ class SemanticScholarSearcher(BaseSearcher):
                     'Year': item.get('year'),
                     'Abstract': abstract,
                     'URL': item.get('url'),
-                    'Source': self.name
+                    'Source': self.name,
+                    # Added Citation
+                    'Citation': item.get('citationCount', 0),
+                    # ADDED: DOI and Venue
+                    'DOI': item.get('doi'),
+                    'Venue': item.get('venue')
                 }
                 self.results.append(paper)
             self.logger.info(f"Found {len(self.results)} papers.")

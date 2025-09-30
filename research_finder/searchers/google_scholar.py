@@ -1,5 +1,6 @@
 import time
 import logging
+import re # Import regex
 from .base_searcher import BaseSearcher
 
 try:
@@ -24,16 +25,27 @@ class GoogleScholarSearcher(BaseSearcher):
             for i, pub in enumerate(search_query):
                 if i >= limit:
                     break
+                
+                # UPDATED: Try to find DOI in the URL
+                doi = None
+                url = pub.get('pub_url', '')
+                if 'doi.org/' in url:
+                    doi = url.split('doi.org/')[-1]
+
                 paper = {
                     'Title': pub.get('bib', {}).get('title'),
                     'Authors': pub.get('bib', {}).get('author', ''),
                     'Year': pub.get('bib', {}).get('pub_year'),
                     'Abstract': pub.get('bib', {}).get('abstract'),
-                    'URL': pub.get('pub_url'),
-                    'Source': self.name
+                    'URL': url,
+                    'Source': self.name,
+                    'Citation': pub.get('bib', {}).get('num_citations', 'N/A'),
+                    # ADDED: Parsed DOI and Venue (if available)
+                    'DOI': doi,
+                    'Venue': pub.get('bib', {}).get('journal', '') # Sometimes available
                 }
                 self.results.append(paper)
-                time.sleep(1) # Be respectful to the server
+                time.sleep(1)
             self.logger.info(f"Found {len(self.results)} papers.")
         except Exception as e:
             self.logger.error(f"Search failed: {e}. This is common with Google Scholar.")
