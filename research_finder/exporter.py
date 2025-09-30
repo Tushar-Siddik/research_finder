@@ -23,7 +23,7 @@ class Exporter:
 
             df = pd.DataFrame(data)
             # UPDATED: Reordered columns to include new fields
-            df = df[['Title', 'Authors', 'Year', 'Venue', 'Citation', 'DOI', 'URL', 'Source', 'APA 7 Reference', 'Abstract']]
+            df = df[['Title', 'Authors', 'Year', 'Venue', 'Source', 'Citation', 'DOI', 'URL', 'APA 7 Reference']]
             df.to_csv(filename, index=False, encoding='utf-8')
             self.logger.info(f"Successfully exported {len(data)} results to {filename}")
         except Exception as e:

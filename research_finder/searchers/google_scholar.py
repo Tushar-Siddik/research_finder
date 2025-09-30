@@ -36,7 +36,7 @@ class GoogleScholarSearcher(BaseSearcher):
                     'Title': pub.get('bib', {}).get('title'),
                     'Authors': pub.get('bib', {}).get('author', ''),
                     'Year': pub.get('bib', {}).get('pub_year'),
-                    'Abstract': pub.get('bib', {}).get('abstract'),
+                    # 'Abstract': pub.get('bib', {}).get('abstract'),
                     'URL': url,
                     'Source': self.name,
                     'Citation': pub.get('bib', {}).get('num_citations', 'N/A'),

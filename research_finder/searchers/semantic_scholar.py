@@ -27,13 +27,13 @@ class SemanticScholarSearcher(BaseSearcher):
             
             for item in data.get('data', []):
                 authors = [author.get('name') for author in item.get('authors', [])]
-                abstract = item.get('tldr', {}).get('text') or item.get('abstract')
+                # abstract = item.get('tldr', {}).get('text') or item.get('abstract')
 
                 paper = {
                     'Title': item.get('title'),
                     'Authors': ', '.join(authors),
                     'Year': item.get('year'),
-                    'Abstract': abstract,
+                    # 'Abstract': abstract,
                     'URL': item.get('url'),
                     'Source': self.name,
                     # Added Citation

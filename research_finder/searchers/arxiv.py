@@ -34,7 +34,7 @@ class ArxivSearcher(BaseSearcher):
                     'Title': entry.title,
                     'Authors': ', '.join(authors),
                     'Year': entry.published.split('-')[0],
-                    'Abstract': entry.summary,
+                    # 'Abstract': entry.summary,
                     'URL': entry.link,
                     'Source': self.name,
                     'Citation': 'N/A',
