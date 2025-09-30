@@ -1,0 +1,154 @@
+import requests
+import logging
+import time
+import xml.etree.ElementTree as ET
+from .base_searcher import BaseSearcher
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from config import PUBMED_ESEARCH_URL, PUBMED_EFETCH_URL, REQUEST_TIMEOUT, PUBMED_RATE_LIMIT, PUBMED_API_KEY
+
+class PubmedSearcher(BaseSearcher):
+    """Searcher for the PubMed API (Entrez) with an API key."""
+    
+    _last_request_time = 0
+
+    def __init__(self, cache_manager=None):
+        super().__init__("PubMed", cache_manager)
+        self.logger = logging.getLogger(self.name)
+        self.api_key = PUBMED_API_KEY
+        self.rate_limit = PUBMED_RATE_LIMIT
+        
+        if self.api_key:
+            self.logger.info(f"Using PubMed API key with rate limit of {1/self.rate_limit:.0f} requests per second")
+        else:
+            self.logger.warning("No PubMed API key found. Using unauthenticated requests with lower rate limits.")
+            self.rate_limit = 0.33 # 3 requests per second without key
+
+    def _enforce_rate_limit(self):
+        """Ensure we don't exceed the rate limit."""
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+        
+        if time_since_last_request < self.rate_limit:
+            sleep_time = self.rate_limit - time_since_last_request
+            self.logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
+            time.sleep(sleep_time)
+        
+        self._last_request_time = time.time()
+
+    def search(self, query: str, limit: int = 10) -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit}")
+        
+        # Try to get from cache first
+        cached_results = self._get_from_cache(query, limit)
+        if cached_results:
+            self.results = cached_results
+            return
+            
+        self.clear_results()
+        
+        try:
+            # Step 1: Use esearch to get a list of PMIDs
+            self._enforce_rate_limit()
+            search_params = {
+                'db': 'pubmed',
+                'term': query,
+                'retmode': 'json',
+                'retmax': limit
+            }
+            if self.api_key:
+                search_params['api_key'] = self.api_key
+                
+            self.logger.debug(f"Searching PubMed with params: {search_params}")
+            search_response = requests.get(PUBMED_ESEARCH_URL, params=search_params, timeout=REQUEST_TIMEOUT)
+            search_response.raise_for_status()
+            search_data = search_response.json()
+            id_list = search_data.get('esearchresult', {}).get('idlist', [])
+            
+            if not id_list:
+                self.logger.info("No articles found in PubMed.")
+                return
+
+            # Step 2: Use efetch to get details for the PMIDs
+            self._enforce_rate_limit()
+            fetch_params = {
+                'db': 'pubmed',
+                'id': ','.join(id_list),
+                'retmode': 'xml'
+            }
+            if self.api_key:
+                fetch_params['api_key'] = self.api_key
+
+            self.logger.debug(f"Fetching details for {len(id_list)} PMIDs.")
+            fetch_response = requests.get(PUBMED_EFETCH_URL, params=fetch_params, timeout=REQUEST_TIMEOUT)
+            fetch_response.raise_for_status()
+            
+            # Parse the XML response
+            root = ET.fromstring(fetch_response.content)
+            
+            for article in root.findall('.//PubmedArticle'):
+                article_data = article.find('MedlineCitation').find('Article')
+                
+                title_elem = article_data.find('ArticleTitle')
+                title = title_elem.text if title_elem is not None else 'N/A'
+                
+                authors = []
+                for author in article_data.findall('.//Author'):
+                    last_name = author.find('LastName')
+                    fore_name = author.find('ForeName')
+                    # Handle cases where names might be collective
+                    if last_name is not None and fore_name is not None:
+                        authors.append(f"{fore_name.text} {last_name.text}")
+                    elif last_name is not None:
+                        authors.append(last_name.text)
+                
+                year = 'N/A'
+                journal_issue = article_data.find('Journal').find('JournalIssue')
+                if journal_issue is not None:
+                    pub_date = journal_issue.find('PubDate')
+                    if pub_date is not None:
+                        year_elem = pub_date.find('Year')
+                        if year_elem is not None:
+                            year = year_elem.text
+                
+                venue_elem = article_data.find('Journal').find('Title')
+                venue = venue_elem.text if venue_elem is not None else 'N/A'
+                
+                # DOI is often in the ArticleIdList
+                doi = 'N/A'
+                article_id_list = article.find('PubmedData').find('ArticleIdList')
+                if article_id_list is not None:
+                    for aid in article_id_list.findall('ArticleId'):
+                        if aid.get('IdType') == 'doi':
+                            doi = aid.text
+                            break
+                
+                # PubMed doesn't provide license info in the standard fetch
+                license_info = 'N/A'
+                
+                # Construct the PubMed URL
+                pmid = article.find('MedlineCitation').get('PMID')
+                url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+
+                paper = {
+                    'Title': title,
+                    'Authors': ', '.join(authors),
+                    'Year': year,
+                    'Venue': venue,
+                    'Source': self.name,
+                    'Citation Count': 'N/A', # Not available in standard fetch
+                    'DOI': doi,
+                    'License Type': license_info,
+                    'URL': url
+                }
+                self.results.append(paper)
+            
+            # Save to cache
+            self._save_to_cache(query, limit)
+            self.logger.info(f"Found {len(self.results)} papers.")
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"API request failed: {e}")
+        except ET.ParseError as e:
+            self.logger.error(f"Failed to parse PubMed XML response: {e}")

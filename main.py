@@ -3,6 +3,7 @@ from research_finder.aggregator import Aggregator
 from research_finder.exporter import Exporter
 from research_finder.searchers.semantic_scholar import SemanticScholarSearcher
 from research_finder.searchers.arxiv import ArxivSearcher
+from research_finder.searchers.pubmed import PubmedSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
@@ -81,7 +82,8 @@ def get_searcher_selection():
     # Each item is a tuple: (Display Name, Searcher Class)
     available_searchers = [
         ("Semantic Scholar", SemanticScholarSearcher),
-        ("arXiv", ArxivSearcher)
+        ("arXiv", ArxivSearcher),
+        ("PubMed", PubmedSearcher)
     ]
     if GOOGLE_SCHOLAR_AVAILABLE:
         available_searchers.append(("Google Scholar (Unreliable)", GoogleScholarSearcher))
