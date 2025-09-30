@@ -36,7 +36,7 @@ def get_user_input():
 
     output_file = input("Enter output CSV filename (e.g., results.csv): ").strip()
     if not output_file:
-        output_file = f"{query}_search_results.csv"
+        output_file = f"{query} search_results.csv"
     if not output_file.endswith('.csv'):
         output_file += '.csv'
 
@@ -50,10 +50,26 @@ def get_user_input():
                 print("Please enter a positive number.")
         except ValueError:
             print("Invalid input. Please enter a number.")
+    
+    # Improved cache management options
+    print("\n--- Cache Management ---")
+    print("1. Don't clear cache (use existing cached results)")
+    print("2. Clear only expired cache entries")
+    print("3. Clear all cache entries")
+    
+    while True:
+        cache_option = input("Select cache option (1-3, default=1): ").strip()
+        if not cache_option:
+            cache_option = "1"
             
-    # Add cache management options
-    clear_cache = input("Clear all cache before searching? (y/n): ").strip().lower() == 'y'
-    clear_expired = input("Clear only expired cache entries? (y/n): ").strip().lower() == 'y'
+        if cache_option in ["1", "2", "3"]:
+            break
+        else:
+            print("Invalid option. Please enter 1, 2, or 3.")
+    
+    # Convert to boolean flags for backward compatibility
+    clear_cache = (cache_option == "3")
+    clear_expired = (cache_option == "2")
             
     return query, output_file, limit, clear_cache, clear_expired
 
@@ -109,7 +125,7 @@ def main():
     logger = logging.getLogger("Main")
 
     # 1. Get user input for the search
-    query, output_file, limit, clear_cache, clear_expired = get_user_input()
+    query, output_file, limit, clear_cache, _ = get_user_input()  # Ignore the second flag
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
@@ -122,14 +138,14 @@ def main():
     if clear_cache:
         aggregator.clear_cache()
         logger.info("All cache cleared.")
-    elif clear_expired:
+    else:
+        # Always clear expired entries for better performance
         aggregator.clear_expired_cache()
         logger.info("Expired cache entries cleared.")
 
     # 5. Instantiate and add the selected searchers to the Aggregator
     for searcher_class in selected_searcher_classes:
         try:
-            # Pass the cache manager to each searcher
             searcher = searcher_class(cache_manager=aggregator.cache_manager)
             aggregator.add_searcher(searcher)
         except Exception as e:
@@ -143,6 +159,6 @@ def main():
         exporter.to_csv(all_articles, output_file)
     else:
         logger.info("No articles found to export.")
-
+        
 if __name__ == "__main__":
     main()
