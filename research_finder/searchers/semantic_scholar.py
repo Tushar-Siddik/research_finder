@@ -21,8 +21,9 @@ class SemanticScholarSearcher(BaseSearcher):
             'fields': 'title,authors,year,abstract,url,citationCount,tldr,doi,venue,openAccessPdf.license'
         }
         try:
-            response = requests.get(self.BASE_URL, params=params)
+            response = requests.get(self.BASE_URL, params=params, timeout=10)
             response.raise_for_status()
+            
             data = response.json()
             
             for item in data.get('data', []):
@@ -46,5 +47,10 @@ class SemanticScholarSearcher(BaseSearcher):
                 }
                 self.results.append(paper)
             self.logger.info(f"Found {len(self.results)} papers.")
+        
+        except requests.exceptions.Timeout:
+            self.logger.error("Request to Semantic Scholar API timed out")
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"HTTP error occurred: {e}")
         except requests.exceptions.RequestException as e:
             self.logger.error(f"API request failed: {e}")
