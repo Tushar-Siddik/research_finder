@@ -16,17 +16,23 @@ class Aggregator:
             self.logger.info(f"Added searcher: {searcher.name}")
         else:
             self.logger.error(f"Failed to add searcher: {searcher} is not a valid BaseSearcher instance.")
-
+    
     def run_all_searches(self, query: str, limit: int) -> List[dict]:
         """
         Runs the search query on all added searchers and returns combined results.
         """
         self.logger.info(f"--- Starting search for '{query}' ---")
         all_results = []
+        seen_titles = set()  # Track seen titles to avoid duplicates
+        
         for searcher in self.searchers:
             try:
                 searcher.search(query, limit)
-                all_results.extend(searcher.get_results())
+                for result in searcher.get_results():
+                    title = result.get('Title', '').lower().strip()
+                    if title and title not in seen_titles:
+                        seen_titles.add(title)
+                        all_results.append(result)
             except Exception as e:
                 self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}")
         
