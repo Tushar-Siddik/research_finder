@@ -2,3 +2,5 @@ requests
 pandas
 feedparser
 scholarly
+python-dotenv
+pyalex

@@ -25,6 +25,11 @@ PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi
 PUBMED_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 PUBMED_RATE_LIMIT = 0.1  # 10 requests per second with API key (1/10 = 0.1s between requests)
 
+# # OpenAlex API settings
+# # We are Using pyalex Python package
+# OPENALEX_API_URL = "https://api.openalex.org/works"
+# OPENALEX_RATE_LIMIT = 0.1  # 10 requests per second (conservative, OpenAlex allows much more)
+
 # Default settings
 DEFAULT_RESULTS_LIMIT = 10
 REQUEST_TIMEOUT = 10  # seconds

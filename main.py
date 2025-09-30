@@ -18,6 +18,14 @@ except ImportError:
     print("Warning: 'scholarly' library not found. Google Scholar will not be an option.")
     print("To enable it, run: pip install scholarly")
 
+try:
+    from research_finder.searchers.openalex import OpenAlexSearcher
+    PYALEX_AVAILABLE = True
+except ImportError:
+    PYALEX_AVAILABLE = False
+    print("Warning: 'pyalex' library not found. OpenAlex will not be an option.")
+    print("To enable it, run: pip install pyalex")
+
 
 def setup_logging():
     """Configure basic logging for the application."""
@@ -85,6 +93,8 @@ def get_searcher_selection():
         ("arXiv", ArxivSearcher),
         ("PubMed", PubmedSearcher)
     ]
+    if PYALEX_AVAILABLE:
+        available_searchers.append(("OpenAlex", OpenAlexSearcher))
     if GOOGLE_SCHOLAR_AVAILABLE:
         available_searchers.append(("Google Scholar (Unreliable)", GoogleScholarSearcher))
 
@@ -150,6 +160,8 @@ def main():
         try:
             searcher = searcher_class(cache_manager=aggregator.cache_manager)
             aggregator.add_searcher(searcher)
+        except ImportError as e:
+            logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
         except Exception as e:
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
