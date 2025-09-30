@@ -14,11 +14,11 @@ class SemanticScholarSearcher(BaseSearcher):
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         self.clear_results()
-        # UPDATED: Added 'doi' and 'venue' to fields
+        # UPDATED: Added 'openAccessPdf.license' to the fields to retrieve
         params = {
             'query': query,
             'limit': limit,
-            'fields': 'title,authors,year,abstract,url,citationCount,tldr,doi,venue'
+            'fields': 'title,authors,year,abstract,url,citationCount,tldr,doi,venue,openAccessPdf.license'
         }
         try:
             response = requests.get(self.BASE_URL, params=params)
@@ -27,7 +27,10 @@ class SemanticScholarSearcher(BaseSearcher):
             
             for item in data.get('data', []):
                 authors = [author.get('name') for author in item.get('authors', [])]
-                # abstract = item.get('tldr', {}).get('text') or item.get('abstract')
+                abstract = item.get('tldr', {}).get('text') or item.get('abstract')
+                
+                # UPDATED: Extract license information
+                license_info = item.get('openAccessPdf', {}).get('license') or 'N/A'
 
                 paper = {
                     'Title': item.get('title'),
@@ -36,11 +39,10 @@ class SemanticScholarSearcher(BaseSearcher):
                     # 'Abstract': abstract,
                     'URL': item.get('url'),
                     'Source': self.name,
-                    # Added Citation
                     'Citation': item.get('citationCount', 0),
-                    # ADDED: DOI and Venue
                     'DOI': item.get('doi'),
-                    'Venue': item.get('venue')
+                    'Venue': item.get('venue'),
+                    'License Type': license_info
                 }
                 self.results.append(paper)
             self.logger.info(f"Found {len(self.results)} papers.")

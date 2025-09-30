@@ -1,6 +1,8 @@
+# research_finder/searchers/google_scholar.py
+
 import time
 import logging
-import re # Import regex
+import re
 from .base_searcher import BaseSearcher
 
 try:
@@ -26,7 +28,6 @@ class GoogleScholarSearcher(BaseSearcher):
                 if i >= limit:
                     break
                 
-                # UPDATED: Try to find DOI in the URL
                 doi = None
                 url = pub.get('pub_url', '')
                 if 'doi.org/' in url:
@@ -40,9 +41,9 @@ class GoogleScholarSearcher(BaseSearcher):
                     'URL': url,
                     'Source': self.name,
                     'Citation': pub.get('bib', {}).get('num_citations', 'N/A'),
-                    # ADDED: Parsed DOI and Venue (if available)
                     'DOI': doi,
-                    'Venue': pub.get('bib', {}).get('journal', '') # Sometimes available
+                    'Venue': pub.get('bib', {}).get('journal', ''),
+                    'License Type': 'N/A'
                 }
                 self.results.append(paper)
                 time.sleep(1)

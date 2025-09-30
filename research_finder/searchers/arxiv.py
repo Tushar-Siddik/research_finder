@@ -27,9 +27,11 @@ class ArxivSearcher(BaseSearcher):
 
             for entry in feed.entries:
                 authors = [author.name for author in entry.authors]
-                # UPDATED: Extract arXiv ID to use as DOI
                 arxiv_id = entry.id.split('/')[-1]
                 
+                # UPDATED: Extract license information
+                license_info = entry.get('rights', 'N/A')
+
                 paper = {
                     'Title': entry.title,
                     'Authors': ', '.join(authors),
@@ -38,9 +40,10 @@ class ArxivSearcher(BaseSearcher):
                     'URL': entry.link,
                     'Source': self.name,
                     'Citation': 'N/A',
-                    # ADDED: Use arXiv ID and set Venue
                     'DOI': arxiv_id,
-                    'Venue': 'arXiv'
+                    'Venue': 'arXiv',
+                    # ADDED: New fields
+                    'License Type': license_info
                 }
                 self.results.append(paper)
             self.logger.info(f"Found {len(self.results)} papers.")
