@@ -27,8 +27,14 @@ PUBMED_RATE_LIMIT = 0.1  # 10 requests per second with API key (1/10 = 0.1s betw
 
 # # OpenAlex API settings
 # # We are Using pyalex Python package
+# # https://github.com/J535D165/pyalex
 # OPENALEX_API_URL = "https://api.openalex.org/works"
 # OPENALEX_RATE_LIMIT = 0.1  # 10 requests per second (conservative, OpenAlex allows much more)
+
+# CrossRef API settings
+CROSSREF_API_URL = "https://api.crossref.org/works"
+CROSSREF_RATE_LIMIT = 1.0  # 1 request per second (be polite)
+CROSSREF_MAILTO = os.getenv("CROSSREF_MAILTO", "")  # Optional but recommended for better rate limits
 
 # Default settings
 DEFAULT_RESULTS_LIMIT = 10

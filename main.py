@@ -4,6 +4,7 @@ from research_finder.exporter import Exporter
 from research_finder.searchers.semantic_scholar import SemanticScholarSearcher
 from research_finder.searchers.arxiv import ArxivSearcher
 from research_finder.searchers.pubmed import PubmedSearcher
+from research_finder.searchers.crossref import CrossrefSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
@@ -91,7 +92,8 @@ def get_searcher_selection():
     available_searchers = [
         ("Semantic Scholar", SemanticScholarSearcher),
         ("arXiv", ArxivSearcher),
-        ("PubMed", PubmedSearcher)
+        ("PubMed", PubmedSearcher),
+        ("CrossRef", CrossrefSearcher)
     ]
     if PYALEX_AVAILABLE:
         available_searchers.append(("OpenAlex", OpenAlexSearcher))
