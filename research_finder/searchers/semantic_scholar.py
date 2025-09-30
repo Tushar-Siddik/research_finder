@@ -47,10 +47,12 @@ class SemanticScholarSearcher(BaseSearcher):
             return
             
         self.clear_results()
+        
+        # We use 'externalIds' to get the DOI.
         params = {
             'query': query,
             'limit': limit,
-            'fields': 'title,authors,year,abstract,url,citationCount,tldr,doi,venue,openAccessPdf.license'
+            'fields': 'title,authors,year,abstract,url,citationCount,venue,openAccessPdf,externalIds'
         }
         
         # Set up headers with API key if available
@@ -62,19 +64,28 @@ class SemanticScholarSearcher(BaseSearcher):
             # Enforce rate limit before making the request
             self._enforce_rate_limit()
             
+            self.logger.debug(f"Making request to {self.BASE_URL} with params: {params}")
+            
             response = requests.get(
                 self.BASE_URL, 
                 params=params, 
                 headers=headers,
                 timeout=REQUEST_TIMEOUT
             )
+            
             response.raise_for_status()
             data = response.json()
             
             for item in data.get('data', []):
                 authors = [author.get('name') for author in item.get('authors', [])]
-                abstract = item.get('tldr', {}).get('text') or item.get('abstract')
-                license_info = item.get('openAccessPdf', {}).get('license') or 'N/A'
+                
+                # CORRECTED: Extract DOI from externalIds
+                external_ids = item.get('externalIds', {})
+                doi = external_ids.get('DOI', 'N/A')
+                
+                # Extract license information
+                open_access_pdf = item.get('openAccessPdf', {})
+                license_info = open_access_pdf.get('license') if open_access_pdf else 'N/A'
 
                 paper = {
                     'Title': item.get('title'),
@@ -83,7 +94,7 @@ class SemanticScholarSearcher(BaseSearcher):
                     'URL': item.get('url'),
                     'Source': self.name,
                     'Citation Count': item.get('citationCount', 0),
-                    'DOI': item.get('doi'),
+                    'DOI': doi,  # Now correctly extracted
                     'Venue': item.get('venue'),
                     'License Type': license_info
                 }
@@ -101,6 +112,12 @@ class SemanticScholarSearcher(BaseSearcher):
             elif e.response.status_code == 429:
                 retry_after = e.response.headers.get('Retry-After', 'unknown')
                 self.logger.error(f"Rate limit exceeded. Retry after {retry_after} seconds.")
+            elif e.response.status_code == 400:
+                try:
+                    error_content = e.response.json()
+                    self.logger.error(f"Bad Request: {error_content}")
+                except:
+                    self.logger.error(f"Bad Request: {e.response.text}")
             else:
                 self.logger.error(f"HTTP error occurred: {e}")
         except requests.exceptions.RequestException as e:
