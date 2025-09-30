@@ -40,7 +40,7 @@ class GoogleScholarSearcher(BaseSearcher):
                     # 'Abstract': pub.get('bib', {}).get('abstract'),
                     'URL': url,
                     'Source': self.name,
-                    'Citation': pub.get('bib', {}).get('num_citations', 'N/A'),
+                    'Citation Count': pub.get('bib', {}).get('num_citations', 'N/A'),
                     'DOI': doi,
                     'Venue': pub.get('bib', {}).get('journal', ''),
                     'License Type': 'N/A'

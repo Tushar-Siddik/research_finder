@@ -39,8 +39,9 @@ class ArxivSearcher(BaseSearcher):
                     # 'Abstract': entry.summary,
                     'URL': entry.link,
                     'Source': self.name,
-                    'Citation': 'N/A',
-                    'DOI': arxiv_id,
+                    'Citation Count': 'N/A',
+                    # 'DOI': arxiv_id,
+                    'DOI': f"10.48550/arXiv.{arxiv_id}" if arxiv_id else 'N/A',
                     'Venue': 'arXiv',
                     # ADDED: New fields
                     'License Type': license_info

@@ -39,7 +39,7 @@ class SemanticScholarSearcher(BaseSearcher):
                     # 'Abstract': abstract,
                     'URL': item.get('url'),
                     'Source': self.name,
-                    'Citation': item.get('citationCount', 0),
+                    'Citation Count': item.get('citationCount', 0),
                     'DOI': item.get('doi'),
                     'Venue': item.get('venue'),
                     'License Type': license_info
