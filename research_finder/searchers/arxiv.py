@@ -15,32 +15,37 @@ class ArxivSearcher(BaseSearcher):
     # BASE_URL = "http://export.arxiv.org/api/query"
     BASE_URL = ARXIV_API_URL
 
-    def __init__(self):
-        super().__init__("arXiv")
+    def __init__(self, cache_manager=None):
+        super().__init__("arXiv", cache_manager)
         self.logger = logging.getLogger(self.name)
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
+        
+        # Try to get from cache first
+        cached_results = self._get_from_cache(query, limit)
+        if cached_results:
+            self.results = cached_results
+            return
+            
         self.clear_results()
-        
-        # Add a small delay before making the request
-        time.sleep(0.5)
-        
         params = {
             'search_query': f'all:"{query}"',
             'start': 0,
             'max_results': limit
         }
+        
+        # Add a small delay before making the request
+        time.sleep(0.5)
+        
         try:
-            response = requests.get(self.BASE_URL, params=params)
+            response = requests.get(self.BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             feed = feedparser.parse(response.content)
 
             for entry in feed.entries:
                 authors = [author.name for author in entry.authors]
                 arxiv_id = entry.id.split('/')[-1]
-                
-                # UPDATED: Extract license information
                 license_info = entry.get('rights', 'N/A')
 
                 paper = {
@@ -54,11 +59,17 @@ class ArxivSearcher(BaseSearcher):
                     # 'DOI': arxiv_id,
                     'DOI': f"10.48550/arXiv.{arxiv_id}" if arxiv_id else 'N/A',
                     'Venue': 'arXiv',
-                    # ADDED: New fields
                     'License Type': license_info
                 }
                 self.results.append(paper)
+            
+            # Save to cache
+            self._save_to_cache(query, limit)
             self.logger.info(f"Found {len(self.results)} papers.")
+        except requests.exceptions.Timeout:
+            self.logger.error("Request to arXiv API timed out")
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"HTTP error occurred: {e}")
         except requests.exceptions.RequestException as e:
             self.logger.error(f"API request failed: {e}")
         except Exception as e:

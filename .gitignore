@@ -71,3 +71,6 @@ venv.bak/
 *.json
 !requirements.txt
 search_tool.ipynb
+
+# Cache directory
+cache/

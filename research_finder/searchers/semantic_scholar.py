@@ -1,5 +1,5 @@
+import time
 import requests
-
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -14,37 +14,44 @@ class SemanticScholarSearcher(BaseSearcher):
     # BASE_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
     BASE_URL = SEMANTIC_SCHOLAR_API_URL
 
-    def __init__(self):
-        super().__init__("Semantic Scholar")
+    def __init__(self, cache_manager=None):
+        super().__init__("Semantic Scholar", cache_manager)
         self.logger = logging.getLogger(self.name)
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
+        
+        # Try to get from cache first
+        cached_results = self._get_from_cache(query, limit)
+        if cached_results:
+            self.results = cached_results
+            return
+            
         self.clear_results()
-        # UPDATED: Added 'openAccessPdf.license' to the fields to retrieve
+        
         params = {
             'query': query,
             'limit': limit,
             'fields': 'title,authors,year,abstract,url,citationCount,tldr,doi,venue,openAccessPdf.license'
         }
+        
+        # Add rate limiting
+        time.sleep(0.5)
+        
         try:
-            response = requests.get(self.BASE_URL, params=params, timeout=10)
+            response = requests.get(self.BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
-            
             data = response.json()
             
             for item in data.get('data', []):
                 authors = [author.get('name') for author in item.get('authors', [])]
                 abstract = item.get('tldr', {}).get('text') or item.get('abstract')
-                
-                # UPDATED: Extract license information
                 license_info = item.get('openAccessPdf', {}).get('license') or 'N/A'
 
                 paper = {
                     'Title': item.get('title'),
                     'Authors': ', '.join(authors),
                     'Year': item.get('year'),
-                    # 'Abstract': abstract,
                     'URL': item.get('url'),
                     'Source': self.name,
                     'Citation Count': item.get('citationCount', 0),
@@ -53,8 +60,11 @@ class SemanticScholarSearcher(BaseSearcher):
                     'License Type': license_info
                 }
                 self.results.append(paper)
+            
+            # Save to cache
+            self._save_to_cache(query, limit)
             self.logger.info(f"Found {len(self.results)} papers.")
-        
+            
         except requests.exceptions.Timeout:
             self.logger.error("Request to Semantic Scholar API timed out")
         except requests.exceptions.HTTPError as e:

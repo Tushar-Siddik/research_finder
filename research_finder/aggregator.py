@@ -1,12 +1,10 @@
-import os
 from pathlib import Path
-
-import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
 
 import logging
 from typing import List
 from .searchers.base_searcher import BaseSearcher
+from .cache import CacheManager
+import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import CACHE_DIR, CACHE_EXPIRY_HOURS
 
@@ -16,12 +14,15 @@ class Aggregator:
     def __init__(self):
         self.searchers: List[BaseSearcher] = []
         self.logger = logging.getLogger("Aggregator")
-        self.cache_dir = CACHE_DIR
-        os.makedirs(self.cache_dir, exist_ok=True)
+        # Initialize cache manager
+        self.cache_manager = CacheManager(CACHE_DIR, CACHE_EXPIRY_HOURS)
+        self.logger.info(f"Cache initialized at {CACHE_DIR} with expiry of {CACHE_EXPIRY_HOURS} hours")
 
     def add_searcher(self, searcher: BaseSearcher) -> None:
         """Adds a searcher instance to the list."""
         if isinstance(searcher, BaseSearcher):
+            # Set the cache manager for the searcher
+            searcher.cache_manager = self.cache_manager
             self.searchers.append(searcher)
             self.logger.info(f"Added searcher: {searcher.name}")
         else:
@@ -50,3 +51,11 @@ class Aggregator:
         
         self.logger.info(f"--- Search complete. Total results found: {len(all_results)} ---")
         return all_results
+    
+    def clear_cache(self) -> None:
+        """Clear all cached search results."""
+        self.cache_manager.clear()
+        
+    def clear_expired_cache(self) -> None:
+        """Remove only expired cache files."""
+        self.cache_manager.clear_expired()

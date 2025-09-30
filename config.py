@@ -15,6 +15,7 @@ CACHE_EXPIRY_HOURS = 24
 
 # Cache settings
 CACHE_DIR = os.path.join(PROJECT_ROOT, "cache")
+CACHE_EXPIRY_HOURS = 24  # Cache expires after 24 hours
 
 # Output settings
 DEFAULT_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")

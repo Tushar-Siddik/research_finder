@@ -1,12 +1,12 @@
 import logging
-import os
-import sys
-from pathlib import Path
 from research_finder.aggregator import Aggregator
 from research_finder.exporter import Exporter
 from research_finder.searchers.semantic_scholar import SemanticScholarSearcher
 from research_finder.searchers.arxiv import ArxivSearcher
-from config import DEFAULT_OUTPUT_DIR, LOG_LEVEL, LOG_FORMAT
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+from config import LOG_LEVEL, LOG_FORMAT
 
 # We will handle the optional Google Scholar import here
 try:
@@ -36,7 +36,7 @@ def get_user_input():
 
     output_file = input("Enter output CSV filename (e.g., results.csv): ").strip()
     if not output_file:
-        output_file = "search_results.csv"
+        output_file = f"{query}_search_results.csv"
     if not output_file.endswith('.csv'):
         output_file += '.csv'
 
@@ -51,7 +51,11 @@ def get_user_input():
         except ValueError:
             print("Invalid input. Please enter a number.")
             
-    return query, output_file, limit
+    # Add cache management options
+    clear_cache = input("Clear all cache before searching? (y/n): ").strip().lower() == 'y'
+    clear_expired = input("Clear only expired cache entries? (y/n): ").strip().lower() == 'y'
+            
+    return query, output_file, limit, clear_cache, clear_expired
 
 def get_searcher_selection():
     """
@@ -105,7 +109,7 @@ def main():
     logger = logging.getLogger("Main")
 
     # 1. Get user input for the search
-    query, output_file, limit = get_user_input()
+    query, output_file, limit, clear_cache, clear_expired = get_user_input()
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
@@ -113,18 +117,28 @@ def main():
     # 3. Initialize Components
     aggregator = Aggregator()
     exporter = Exporter()
+    
+    # 4. Handle cache clearing if requested
+    if clear_cache:
+        aggregator.clear_cache()
+        logger.info("All cache cleared.")
+    elif clear_expired:
+        aggregator.clear_expired_cache()
+        logger.info("Expired cache entries cleared.")
 
-    # 4. Instantiate and add the selected searchers to the Aggregator
+    # 5. Instantiate and add the selected searchers to the Aggregator
     for searcher_class in selected_searcher_classes:
         try:
-            aggregator.add_searcher(searcher_class())
+            # Pass the cache manager to each searcher
+            searcher = searcher_class(cache_manager=aggregator.cache_manager)
+            aggregator.add_searcher(searcher)
         except Exception as e:
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
-    # 5. Run Searches and Get Results
+    # 6. Run Searches and Get Results
     all_articles = aggregator.run_all_searches(query, limit)
 
-    # 6. Export Results
+    # 7. Export Results
     if all_articles:
         exporter.to_csv(all_articles, output_file)
     else:
