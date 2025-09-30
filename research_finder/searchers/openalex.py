@@ -54,9 +54,16 @@ class OpenAlexSearcher(BaseSearcher):
                 "best_oa_location"
             ]
             
+            # results = (
+            #     Works()
+            #     .filter(**{"default.search": query})
+            #     .select(fields_to_select)
+            #     .get(per_page=limit)
+            # )
+            
             results = (
                 Works()
-                .filter(**{"default.search": query})
+                .search(query)  # Use the search() method instead
                 .select(fields_to_select)
                 .get(per_page=limit)
             )
