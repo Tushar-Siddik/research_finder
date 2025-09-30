@@ -130,6 +130,26 @@ class PubmedSearcher(BaseSearcher):
                 # Construct the PubMed URL
                 pmid = article.find('MedlineCitation').get('PMID')
                 url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                
+                # To get citation, you need NIH iCite API
+                def fetch_citation_count(pmid):
+                    nih_url = f"https://icite.od.nih.gov/api/pubs?pmids={pmid}"
+                    try:
+                        nih_response = requests.get(nih_url, timeout=10)
+                        nih_response.raise_for_status()
+                        nih_data = nih_response.json().get('data', [])
+                        if nih_data:
+                            return nih_data[0].get('citations', 0)
+                        
+                    except requests.exceptions.RequestException as e:
+                        print(f"Request error for PMID {pmid}: {e}")
+                    except (ValueError, KeyError, IndexError) as e:
+                        print(f"Data error for PMID {pmid}: {e}")
+                    
+                    return None  # Return None or 0 if you prefer
+
+                # Fetch citation count safely
+                citation_count = fetch_citation_count(pmid)
 
                 paper = {
                     'Title': title,
@@ -137,7 +157,7 @@ class PubmedSearcher(BaseSearcher):
                     'Year': year,
                     'Venue': venue,
                     'Source': self.name,
-                    'Citation Count': 'N/A', # Not available in standard fetch
+                    'Citation Count': citation_count,
                     'DOI': doi,
                     'License Type': license_info,
                     'URL': url
