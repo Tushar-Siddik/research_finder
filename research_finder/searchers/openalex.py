@@ -20,7 +20,6 @@ class OpenAlexSearcher(BaseSearcher):
         self.logger = logging.getLogger(self.name)
         
         # The library recommends setting a polite email for better rate limits
-        # You can set your email here if you want
         # pyalex.config.email = "your.email@example.com"
         
         self.logger.info("Using OpenAlex via the pyalex package.")
@@ -40,33 +39,18 @@ class OpenAlexSearcher(BaseSearcher):
             # Use pyalex to search for works
             self.logger.debug(f"Querying OpenAlex for '{query}'")
             
-            # Fields to select
-            fields_to_select = [
-                "id",
-                "display_name",
-                "publication_year",
-                "primary_location",
-                "authorships",
-                "cited_by_count",
-                "open_access",
-                "doi",
-                "type",
-                "best_oa_location"
-            ]
+            # fields_to_select = "id,display_name,publication_year,primary_location,authorships,cited_by_count,open_access,doi,type,best_oa_location"
             
-            # results = (
-            #     Works()
-            #     .filter(**{"default.search": query})
-            #     .select(fields_to_select)
-            #     .get(per_page=limit)
-            # )
-            
+            # Use the search() method and pass the string to select()
             results = (
                 Works()
-                .search(query)  # Use the search() method instead
-                .select(fields_to_select)
+                .search(query)
+                # .select(fields_to_select)
                 .get(per_page=limit)
             )
+            
+            # DEBUG: Log the number of results returned
+            self.logger.debug(f"OpenAlex returned {len(results)} results.")
             
             if not results:
                 self.logger.info("No articles found in OpenAlex.")
