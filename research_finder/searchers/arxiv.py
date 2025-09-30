@@ -1,4 +1,6 @@
 import requests
+import time
+
 import feedparser
 import logging
 from .base_searcher import BaseSearcher
@@ -15,6 +17,10 @@ class ArxivSearcher(BaseSearcher):
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         self.clear_results()
+        
+        # Add a small delay before making the request
+        time.sleep(0.5)
+        
         params = {
             'search_query': f'all:"{query}"',
             'start': 0,
