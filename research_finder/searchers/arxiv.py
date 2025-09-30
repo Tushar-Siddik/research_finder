@@ -7,17 +7,30 @@ import requests
 import feedparser
 import logging
 from .base_searcher import BaseSearcher
-from config import ARXIV_API_URL, REQUEST_TIMEOUT
+from config import ARXIV_API_URL, REQUEST_TIMEOUT, ARXIV_RATE_LIMIT
 
 class ArxivSearcher(BaseSearcher):
     """Searcher for the arXiv API."""
     
-    # BASE_URL = "http://export.arxiv.org/api/query"
     BASE_URL = ARXIV_API_URL
+    _last_request_time = 0
 
     def __init__(self, cache_manager=None):
         super().__init__("arXiv", cache_manager)
         self.logger = logging.getLogger(self.name)
+        self.rate_limit = ARXIV_RATE_LIMIT
+
+    def _enforce_rate_limit(self):
+        """Ensure we don't exceed the rate limit."""
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+        
+        if time_since_last_request < self.RATE_LIMIT:
+            sleep_time = self.RATE_LIMIT - time_since_last_request
+            self.logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
+            time.sleep(sleep_time)
+        
+        self._last_request_time = time.time()
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
@@ -36,7 +49,7 @@ class ArxivSearcher(BaseSearcher):
         }
         
         # Add a small delay before making the request
-        time.sleep(0.5)
+        self._enforce_rate_limit()
         
         try:
             response = requests.get(self.BASE_URL, params=params, timeout=REQUEST_TIMEOUT)

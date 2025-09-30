@@ -39,6 +39,8 @@ class Aggregator:
         total_searchers = len(self.searchers)
         for i, searcher in enumerate(self.searchers, 1):
             print(f"Searching {searcher.name} ({i}/{total_searchers})...")
+            if hasattr(searcher, 'rate_limit'):
+                print(f"  Note: Rate limiting active ({searcher.rate_limit} req/s)")
             try:
                 searcher.search(query, limit)
                 for result in searcher.get_results():
