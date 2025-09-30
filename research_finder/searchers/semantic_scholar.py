@@ -1,11 +1,18 @@
 import requests
+
+from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 import logging
 from .base_searcher import BaseSearcher
+from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT
 
 class SemanticScholarSearcher(BaseSearcher):
     """Searcher for the Semantic Scholar API."""
     
-    BASE_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
+    # BASE_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
+    BASE_URL = SEMANTIC_SCHOLAR_API_URL
 
     def __init__(self):
         super().__init__("Semantic Scholar")

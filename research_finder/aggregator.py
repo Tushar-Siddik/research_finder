@@ -1,6 +1,14 @@
+import os
+from pathlib import Path
+
+import sys
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 import logging
 from typing import List
 from .searchers.base_searcher import BaseSearcher
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from config import CACHE_DIR, CACHE_EXPIRY_HOURS
 
 class Aggregator:
     """Aggregates results from multiple searchers."""
@@ -8,6 +16,8 @@ class Aggregator:
     def __init__(self):
         self.searchers: List[BaseSearcher] = []
         self.logger = logging.getLogger("Aggregator")
+        self.cache_dir = CACHE_DIR
+        os.makedirs(self.cache_dir, exist_ok=True)
 
     def add_searcher(self, searcher: BaseSearcher) -> None:
         """Adds a searcher instance to the list."""
@@ -25,7 +35,9 @@ class Aggregator:
         all_results = []
         seen_titles = set()  # Track seen titles to avoid duplicates
         
-        for searcher in self.searchers:
+        total_searchers = len(self.searchers)
+        for i, searcher in enumerate(self.searchers, 1):
+            print(f"Searching {searcher.name} ({i}/{total_searchers})...")
             try:
                 searcher.search(query, limit)
                 for result in searcher.get_results():

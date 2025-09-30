@@ -1,8 +1,12 @@
 import logging
+import os
+import sys
+from pathlib import Path
 from research_finder.aggregator import Aggregator
 from research_finder.exporter import Exporter
 from research_finder.searchers.semantic_scholar import SemanticScholarSearcher
 from research_finder.searchers.arxiv import ArxivSearcher
+from config import DEFAULT_OUTPUT_DIR, LOG_LEVEL, LOG_FORMAT
 
 # We will handle the optional Google Scholar import here
 try:
@@ -17,8 +21,8 @@ except ImportError:
 def setup_logging():
     """Configure basic logging for the application."""
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=getattr(logging, LOG_LEVEL),
+        format=LOG_FORMAT,
         handlers=[logging.StreamHandler()]
     )
 

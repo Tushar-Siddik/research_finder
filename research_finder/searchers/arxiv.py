@@ -1,14 +1,19 @@
-import requests
 import time
+from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).parent.parent.parent))
+import requests
 
 import feedparser
 import logging
 from .base_searcher import BaseSearcher
+from config import ARXIV_API_URL, REQUEST_TIMEOUT
 
 class ArxivSearcher(BaseSearcher):
     """Searcher for the arXiv API."""
     
-    BASE_URL = "http://export.arxiv.org/api/query"
+    # BASE_URL = "http://export.arxiv.org/api/query"
+    BASE_URL = ARXIV_API_URL
 
     def __init__(self):
         super().__init__("arXiv")
