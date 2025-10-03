@@ -19,7 +19,8 @@ class GoogleScholarSearcher(BaseSearcher):
         if not scholarly:
             raise ImportError("scholarly library not found. Install with 'pip install scholarly'")
         super().__init__("Google Scholar", cache_manager)
-        self.logger = logging.getLogger(self.name)
+        # Google Scholar has no official API. We enforce a conservative rate limit.
+        self.rate_limit = 2.0  # 2 seconds between requests to avoid being blocked
         self.logger.warning("Google Scholar has no official API. Rate limiting is important to avoid being blocked.")
 
     def search(self, query: str, limit: int = 5) -> None:
@@ -38,6 +39,9 @@ class GoogleScholarSearcher(BaseSearcher):
                 if i >= limit:
                     break
                 
+                # Use the inherited rate limiting method before each result
+                self._enforce_rate_limit()
+
                 doi = None
                 url = pub.get('pub_url', '')
                 if 'doi.org/' in url:
@@ -55,9 +59,6 @@ class GoogleScholarSearcher(BaseSearcher):
                     'License Type': 'N/A'
                 }
                 self.results.append(paper)
-                
-                # Add rate limiting
-                time.sleep(2)
             
             # Save to cache
             self._save_to_cache(query, limit)
