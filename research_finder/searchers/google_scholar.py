@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import GOOGLE_SCHOLAR_RATE_LIMIT
-from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
+from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string, normalize_citation_count
 
 try:
     from scholarly import scholarly
@@ -47,7 +47,7 @@ class GoogleScholarSearcher(BaseSearcher):
 
                 paper = {
                     'Title': normalize_string(pub.get('bib', {}).get('title')),
-                    'Authors': normalize_authors(pub.get('bib', {}).get('author', '')),
+                    'Authors': clean_author_list(pub.get('bib', {}).get('author', '')),
                     'Year': normalize_year(pub.get('bib', {}).get('pub_year')),
                     'URL': url,
                     'Source': self.name,

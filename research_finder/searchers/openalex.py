@@ -10,7 +10,7 @@ from .base_searcher import BaseSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
+from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string, normalize_citation_count
 
 try:
     import pyalex
@@ -94,7 +94,7 @@ class OpenAlexSearcher(BaseSearcher):
 
                 paper = {
                     'Title': normalize_string(item.get('display_name')),
-                    'Authors': normalize_authors(authors_list),
+                    'Authors': clean_author_list(authors_list),
                     'Year': normalize_year(item.get('publication_year')),
                     'Venue': normalize_string(primary_location.get('source', {}).get('display_name', 'N/A')),
                     'Source': self.name,

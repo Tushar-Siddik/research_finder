@@ -4,7 +4,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
 from .base_searcher import BaseSearcher
 from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT, S2_API_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
-from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
+from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string, normalize_citation_count
 
 class SemanticScholarSearcher(BaseSearcher):
     """Searcher for the Semantic Scholar API."""
@@ -78,7 +78,7 @@ class SemanticScholarSearcher(BaseSearcher):
 
                 paper = {
                     'Title': normalize_string(item.get('title')),
-                    'Authors': normalize_authors(authors_list),
+                    'Authors': clean_author_list(authors_list),
                     'Year': normalize_year(item.get('year')),
                     'URL': item.get('url'),
                     'Source': self.name,

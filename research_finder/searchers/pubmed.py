@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import PUBMED_ESEARCH_URL, PUBMED_EFETCH_URL, REQUEST_TIMEOUT, PUBMED_API_KEY, PUBMED_RATE_LIMIT_WITH_KEY, PUBMED_RATE_LIMIT_NO_KEY
-from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
+from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string
 
 class PubmedSearcher(BaseSearcher):
     """Searcher for the PubMed API (Entrez) with an API key."""
@@ -150,7 +150,7 @@ class PubmedSearcher(BaseSearcher):
 
                 paper = {
                     'Title': normalize_string(title_elem.text if title_elem is not None else 'N/A'),
-                    'Authors': normalize_authors(authors),
+                    'Authors': clean_author_list(authors),
                     'Year': normalize_year(year),
                     'Venue': normalize_string(venue_elem.text if venue_elem is not None else 'N/A'),
                     'Source': self.name,

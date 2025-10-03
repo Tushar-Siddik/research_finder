@@ -5,7 +5,7 @@ import requests
 import feedparser
 from .base_searcher import BaseSearcher
 from config import ARXIV_API_URL, REQUEST_TIMEOUT, ARXIV_RATE_LIMIT
-from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string 
+from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string 
 
 class ArxivSearcher(BaseSearcher):
     """Searcher for the arXiv API."""
@@ -49,8 +49,8 @@ class ArxivSearcher(BaseSearcher):
 
                 paper = {
                     'Title': normalize_string(entry.title),
-                    'Authors': normalize_authors(authors_list),
-                    'Year': entry.published.split('-')[0],
+                    'Authors': clean_author_list(authors_list),
+                    'Year': normalize_year(entry.published.split('-')[0]),
                     'URL': entry.link,
                     'Source': self.name,
                     'Citation Count': 'N/A',

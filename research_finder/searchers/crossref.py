@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_MAILTO, CROSSREF_RATE_LIMIT_WITH_KEY, CROSSREF_RATE_LIMIT_NO_KEY
-from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
+from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string, normalize_citation_count
 
 class CrossrefSearcher(BaseSearcher):
     """Searcher for the CrossRef API."""
@@ -89,11 +89,12 @@ class CrossrefSearcher(BaseSearcher):
                 # License information can be a list of objects
                 license_info = 'N/A'
                 license_list = item.get('license', [])
-                license_info = normalize_string(license_list[0].get('URL', 'N/A') if license_list else 'N/A')
+                if license_list and isinstance(license_list, list) and len(license_list) > 0:
+                    license_info = license_list[0].get('URL', 'N/A')
 
                 paper = {
                     'Title': normalize_string(title_list[0] if title_list else 'N/A'),
-                    'Authors': normalize_authors(authors),
+                    'Authors': clean_author_list(authors),
                     'Year': normalize_year(year),
                     'Venue': normalize_string(venue_list[0] if venue_list else 'N/A'),
                     'Source': self.name,
