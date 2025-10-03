@@ -40,7 +40,7 @@ class CrossrefSearcher(BaseSearcher):
         params = {
             'query': query,
             'rows': limit,
-            'select': 'title,author,container-title,DOI,created,license,URL' # Select fields to return
+            'select': 'title,author,container-title,DOI,created,license,URL,is-referenced-by-count' # Select fields to return
         }
         
         # Add mailto for politeness and better rate limits
@@ -50,7 +50,11 @@ class CrossrefSearcher(BaseSearcher):
         try:
             self._enforce_rate_limit()
             
-            response = requests.get(self.BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
+            response = requests.get(
+                self.BASE_URL, 
+                params=params, 
+                timeout=REQUEST_TIMEOUT
+            )
             response.raise_for_status()
             data = response.json()
             
@@ -94,7 +98,7 @@ class CrossrefSearcher(BaseSearcher):
                     'Year': year,
                     'Venue': venue,
                     'Source': self.name,
-                    'Citation Count': 'N/A', # CrossRef search doesn't provide citation count
+                    'Citation Count': item.get('is-referenced-by-count', 0), # CrossRef search doesn't provide citation count
                     'DOI': validate_doi(item.get('DOI')),
                     'License Type': license_info,
                     'URL': item.get('URL')

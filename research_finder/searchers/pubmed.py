@@ -1,3 +1,4 @@
+import time
 import requests
 import xml.etree.ElementTree as ET
 from .base_searcher import BaseSearcher
@@ -22,6 +23,30 @@ class PubmedSearcher(BaseSearcher):
             # Without a key, the limit is 3 requests per second
             self.rate_limit = PUBMED_RATE_LIMIT_NO_KEY  # 0.33: ~1/3 = 0.33s between requests
 
+    def _fetch_citation_count(self, pmid: str) -> int:
+        """
+        Fetch citation count for a PubMed ID using NIH iCite API.
+        This is a separate API call, so we add a small delay to be polite.
+        """
+        if not pmid:
+            return 0
+        
+        nih_url = f"https://icite.od.nih.gov/api/pubs?pmids={pmid}"
+        try:
+            # Be polite to the iCite API with a small delay
+            time.sleep(0.2)  # 200ms delay
+            nih_response = requests.get(nih_url, timeout=REQUEST_TIMEOUT)
+            nih_response.raise_for_status()
+            nih_data = nih_response.json().get('data', [])
+            if nih_data:
+                return nih_data[0].get('citations', 0)
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(f"Could not fetch citation count for PMID {pmid}: {e}")
+        except (ValueError, KeyError, IndexError):
+            self.logger.warning(f"Error parsing citation data for PMID {pmid}.")
+        
+        return 0  # Return 0 if we can't get the count
+    
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         
@@ -119,26 +144,9 @@ class PubmedSearcher(BaseSearcher):
                 # Construct the PubMed URL
                 pmid = article.find('MedlineCitation').get('PMID')
                 url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
-                
-                # # To get citation, you need NIH iCite API
-                # def fetch_citation_count(pmid):
-                #     nih_url = f"https://icite.od.nih.gov/api/pubs?pmids={pmid}"
-                #     try:
-                #         nih_response = requests.get(nih_url, timeout=10)
-                #         nih_response.raise_for_status()
-                #         nih_data = nih_response.json().get('data', [])
-                #         if nih_data:
-                #             return nih_data[0].get('citations', 0)
-                        
-                #     except requests.exceptions.RequestException as e:
-                #         print(f"Request error for PMID {pmid}: {e}")
-                #     except (ValueError, KeyError, IndexError) as e:
-                #         print(f"Data error for PMID {pmid}: {e}")
-                    
-                #     return None  # Return None or 0 if you prefer
 
-                # # Fetch citation count safely
-                # citation_count = fetch_citation_count(pmid)
+                # Fetch citation count safely
+                citation_count = self._fetch_citation_count(pmid)
 
                 paper = {
                     'Title': title,
@@ -146,7 +154,7 @@ class PubmedSearcher(BaseSearcher):
                     'Year': year,
                     'Venue': venue,
                     'Source': self.name,
-                    'Citation Count': 'N/A',    # Not available in standard fetch
+                    'Citation Count': citation_count,
                     'DOI': validate_doi(doi),
                     'License Type': license_info,
                     'URL': url
