@@ -11,19 +11,19 @@ from config import PUBMED_ESEARCH_URL, PUBMED_EFETCH_URL, REQUEST_TIMEOUT, PUBME
 class PubmedSearcher(BaseSearcher):
     """Searcher for the PubMed API (Entrez) with an API key."""
     
-    _last_request_time = 0
+    # The class variable for _last_request_time is now removed
 
     def __init__(self, cache_manager=None):
         super().__init__("PubMed", cache_manager)
-        self.logger = logging.getLogger(self.name)
         self.api_key = PUBMED_API_KEY
-        self.rate_limit = PUBMED_RATE_LIMIT
         
-        if self.api_key:
-            self.logger.info(f"Using PubMed API key with rate limit of {1/self.rate_limit:.0f} requests per second")
+        # Use the new check method and adjust rate limit accordingly
+        if self._check_api_key("PubMed API key", self.api_key):
+            # With an API key, the limit is 10 requests per second
+            self.rate_limit = 0.1  # 1/10 = 0.1s between requests
         else:
-            self.logger.warning("No PubMed API key found. Using unauthenticated requests with lower rate limits.")
-            self.rate_limit = 0.33 # 3 requests per second without key
+            # Without a key, the limit is 3 requests per second
+            self.rate_limit = 0.33 # ~1/3 = 0.33s between requests
 
     def _enforce_rate_limit(self):
         """Ensure we don't exceed the rate limit."""
