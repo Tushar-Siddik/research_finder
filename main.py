@@ -1,3 +1,4 @@
+import argparse
 import logging
 from research_finder.aggregator import Aggregator
 from research_finder.exporter import Exporter
@@ -139,7 +140,7 @@ def main():
     logger = logging.getLogger("Main")
 
     # 1. Get user input for the search
-    query, output_file, limit, clear_cache, _ = get_user_input()  # Ignore the second flag
+    query, output_file, limit, clear_cache, _ = get_user_input()
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
@@ -153,7 +154,6 @@ def main():
         aggregator.clear_cache()
         logger.info("All cache cleared.")
     else:
-        # Always clear expired entries for better performance
         aggregator.clear_expired_cache()
         logger.info("Expired cache entries cleared.")
 
@@ -168,7 +168,8 @@ def main():
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
     # 6. Run Searches and Get Results
-    all_articles = aggregator.run_all_searches(query, limit)
+    # Use streaming for large searches to avoid memory issues
+    all_articles = aggregator.run_all_searches(query, limit, stream=True)
 
     # 7. Export Results
     if all_articles:
