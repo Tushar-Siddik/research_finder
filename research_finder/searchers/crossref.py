@@ -6,36 +6,25 @@ from .base_searcher import BaseSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
-
-# Make the import more robust
-try:
-    from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_RATE_LIMIT, CROSSREF_MAILTO
-except ImportError:
-    # Fallback values if config.py is missing or incomplete
-    CROSSREF_API_URL = "https://api.crossref.org/works"
-    REQUEST_TIMEOUT = 10
-    CROSSREF_RATE_LIMIT = 1.0
-    CROSSREF_MAILTO = "" # Default to empty string
-    logging.warning("Could not import CrossRef settings from config.py. Using fallback values.")
+from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_RATE_LIMIT, CROSSREF_MAILTO
 
 class CrossrefSearcher(BaseSearcher):
     """Searcher for the CrossRef API."""
     
     BASE_URL = CROSSREF_API_URL
-    _last_request_time = 0
+    # The class variable for _last_request_time is now removed
 
     def __init__(self, cache_manager=None):
         super().__init__("CrossRef", cache_manager)
-        self.logger = logging.getLogger(self.name)
+        self.mailto = CROSSREF_MAILTO
         
-        # Set attributes with fallbacks
-        self.mailto = getattr(sys.modules[__name__], 'CROSSREF_MAILTO', "")
-        self.rate_limit = getattr(sys.modules[__name__], 'CROSSREF_RATE_LIMIT', 1.0)
-        
-        if self.mailto:
-            self.logger.info(f"Using CrossRef with polite pool email: {self.mailto}")
+        # Use the new check method for the 'mailto' email
+        if self._check_api_key("CrossRef 'mailto' email", self.mailto):
+            # Using the polite pool with an email gives better rate limits
+            self.rate_limit = 1.0  # 1 request per second
         else:
-            self.logger.warning("No CrossRef email provided. Consider adding CROSSREF_MAILTO to your .env for better rate limits.")
+            # Without a mailto, we should be extra polite
+            self.rate_limit = 1.0  # Still 1 req/s, but we can be more conservative if needed
 
     def _enforce_rate_limit(self):
         """Ensure we don't exceed the rate limit."""
