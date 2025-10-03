@@ -43,7 +43,7 @@ class OpenAlexSearcher(BaseSearcher):
         else:
             # Without an email, we should be more conservative
             self.rate_limit = 0.5  # 2 requests per second
-
+    
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         

@@ -1,10 +1,8 @@
-import time
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
 import feedparser
-import logging
 from .base_searcher import BaseSearcher
 from config import ARXIV_API_URL, REQUEST_TIMEOUT, ARXIV_RATE_LIMIT
 
@@ -12,7 +10,6 @@ class ArxivSearcher(BaseSearcher):
     """Searcher for the arXiv API."""
     
     BASE_URL = ARXIV_API_URL
-    # The class variable _last_request_time is now handled by the base class
 
     def __init__(self, cache_manager=None):
         super().__init__("arXiv", cache_manager)
@@ -20,6 +17,7 @@ class ArxivSearcher(BaseSearcher):
         self.rate_limit = ARXIV_RATE_LIMIT
         self.logger.info(f"arXiv searcher initialized with rate limit: {self.rate_limit} req/s")
 
+    
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         

@@ -1,6 +1,4 @@
 import requests
-import logging
-import time
 import xml.etree.ElementTree as ET
 from .base_searcher import BaseSearcher
 import sys
@@ -10,8 +8,6 @@ from config import PUBMED_ESEARCH_URL, PUBMED_EFETCH_URL, REQUEST_TIMEOUT, PUBME
 
 class PubmedSearcher(BaseSearcher):
     """Searcher for the PubMed API (Entrez) with an API key."""
-    
-    # The class variable for _last_request_time is now removed
 
     def __init__(self, cache_manager=None):
         super().__init__("PubMed", cache_manager)
@@ -24,18 +20,6 @@ class PubmedSearcher(BaseSearcher):
         else:
             # Without a key, the limit is 3 requests per second
             self.rate_limit = 0.33 # ~1/3 = 0.33s between requests
-
-    def _enforce_rate_limit(self):
-        """Ensure we don't exceed the rate limit."""
-        current_time = time.time()
-        time_since_last_request = current_time - self._last_request_time
-        
-        if time_since_last_request < self.rate_limit:
-            sleep_time = self.rate_limit - time_since_last_request
-            self.logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
-            time.sleep(sleep_time)
-        
-        self._last_request_time = time.time()
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
@@ -61,7 +45,11 @@ class PubmedSearcher(BaseSearcher):
                 search_params['api_key'] = self.api_key
                 
             self.logger.debug(f"Searching PubMed with params: {search_params}")
-            search_response = requests.get(PUBMED_ESEARCH_URL, params=search_params, timeout=REQUEST_TIMEOUT)
+            search_response = requests.get(
+                PUBMED_ESEARCH_URL, 
+                params=search_params, 
+                timeout=REQUEST_TIMEOUT
+            )
             search_response.raise_for_status()
             search_data = search_response.json()
             id_list = search_data.get('esearchresult', {}).get('idlist', [])

@@ -1,11 +1,8 @@
-import time
-import logging
-import re
 from .base_searcher import BaseSearcher
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from config import REQUEST_TIMEOUT
+from config import REQUEST_TIMEOUT, GOOGLE_SCHOLAR_RATE_LIMIT
 
 try:
     from scholarly import scholarly
@@ -20,9 +17,9 @@ class GoogleScholarSearcher(BaseSearcher):
             raise ImportError("scholarly library not found. Install with 'pip install scholarly'")
         super().__init__("Google Scholar", cache_manager)
         # Google Scholar has no official API. We enforce a conservative rate limit.
-        self.rate_limit = 2.0  # 2 seconds between requests to avoid being blocked
-        self.logger.warning("Google Scholar has no official API. Rate limiting is important to avoid being blocked.")
-
+        self.rate_limit = GOOGLE_SCHOLAR_RATE_LIMIT
+        self.logger.warning("Google Scholar has no official API. Rate limiting is critical to avoid being blocked.")
+    
     def search(self, query: str, limit: int = 5) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}. (Caution: Unreliable)")
         

@@ -1,6 +1,4 @@
 import requests
-import logging
-import time
 from datetime import datetime
 from .base_searcher import BaseSearcher
 import sys
@@ -12,31 +10,18 @@ class CrossrefSearcher(BaseSearcher):
     """Searcher for the CrossRef API."""
     
     BASE_URL = CROSSREF_API_URL
-    # The class variable for _last_request_time is now removed
 
     def __init__(self, cache_manager=None):
         super().__init__("CrossRef", cache_manager)
         self.mailto = CROSSREF_MAILTO
-        
-        # Use the new check method for the 'mailto' email
+        self._check_api_key("CrossRef 'mailto' email", self.mailto)
+        # CrossRef uses a 'mailto' for its polite pool.
         if self._check_api_key("CrossRef 'mailto' email", self.mailto):
-            # Using the polite pool with an email gives better rate limits
+            # The polite pool has a higher limit.
             self.rate_limit = 1.0  # 1 request per second
         else:
-            # Without a mailto, we should be extra polite
-            self.rate_limit = 1.0  # Still 1 req/s, but we can be more conservative if needed
-
-    def _enforce_rate_limit(self):
-        """Ensure we don't exceed the rate limit."""
-        current_time = time.time()
-        time_since_last_request = current_time - self._last_request_time
-        
-        if time_since_last_request < self.rate_limit:
-            sleep_time = self.rate_limit - time_since_last_request
-            self.logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
-            time.sleep(sleep_time)
-        
-        self._last_request_time = time.time()
+            # We should be extra polite if not identifying ourselves.
+            self.rate_limit = 2.0  # 1 request every 2 seconds
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")

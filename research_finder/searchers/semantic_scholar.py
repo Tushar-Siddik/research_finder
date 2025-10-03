@@ -1,9 +1,7 @@
-import time
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
-import logging
 from .base_searcher import BaseSearcher
 from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT, S2_API_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT
 
@@ -24,18 +22,6 @@ class SemanticScholarSearcher(BaseSearcher):
         else:
             # Without a key, the rate limit is much lower
             self.rate_limit = 0.1  # 1 request per 10 seconds
-
-    def _enforce_rate_limit(self):
-        """Ensure we don't exceed the rate limit."""
-        current_time = time.time()
-        time_since_last_request = current_time - self._last_request_time
-        
-        if time_since_last_request < self.rate_limit:
-            sleep_time = self.rate_limit - time_since_last_request
-            self.logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
-            time.sleep(sleep_time)
-        
-        self._last_request_time = time.time()
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
