@@ -18,12 +18,14 @@ ARXIV_API_URL = "http://export.arxiv.org/api/query"
 ARXIV_RATE_LIMIT = 0.5      # 2 requests per second (arXiv is more lenient)
 
 # Google Scholar API settings
+GOOGLE_SCHOLAR_RATE_LIMIT = 5.0    # 1 request every 5 seconds (be very careful)
 
 # PubMed API settings
 PUBMED_API_KEY = os.getenv("PUBMED_API_KEY", "")
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-PUBMED_RATE_LIMIT = 0.1  # 10 requests per second with API key (1/10 = 0.1s between requests)
+PUBMED_RATE_LIMIT_WITH_KEY = 0.1   # 10 requests per second with API key
+PUBMED_RATE_LIMIT_NO_KEY = 0.33    # 3 requests per second without API key
 
 # # OpenAlex API settings
 # # We are Using pyalex Python package
@@ -32,6 +34,8 @@ PUBMED_RATE_LIMIT = 0.1  # 10 requests per second with API key (1/10 = 0.1s betw
 # OPENALEX_RATE_LIMIT = 0.1  # 10 requests per second (conservative, OpenAlex allows much more)
 # OpenAlex API settings
 OPENALEX_EMAIL = os.getenv("OPENALEX_EMAIL", "")
+OPENALEX_RATE_LIMIT_WITH_EMAIL = 0.1 # 10 requests per second with email
+OPENALEX_RATE_LIMIT_NO_EMAIL = 0.5  # 2 requests per second without email
 
 # CrossRef API settings
 CROSSREF_API_URL = "https://api.crossref.org/works"
