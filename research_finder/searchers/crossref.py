@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_MAILTO, CROSSREF_RATE_LIMIT_WITH_KEY, CROSSREF_RATE_LIMIT_NO_KEY
-from ..utils import validate_doi
+from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
 
 class CrossrefSearcher(BaseSearcher):
     """Searcher for the CrossRef API."""
@@ -61,7 +61,7 @@ class CrossrefSearcher(BaseSearcher):
             for item in data.get('message', {}).get('items', []):
                 # Title is often a list
                 title_list = item.get('title', ['N/A'])
-                title = title_list[0] if title_list else 'N/A'
+                # title = normalize_string(title_list[0] if title_list else 'N/A')
                 
                 # Authors can be complex, we'll format them simply
                 authors = []
@@ -84,21 +84,20 @@ class CrossrefSearcher(BaseSearcher):
 
                 # Venue (container-title) is also a list
                 venue_list = item.get('container-title', ['N/A'])
-                venue = venue_list[0] if venue_list else 'N/A'
+                # venue = venue_list[0] if venue_list else 'N/A'
                 
                 # License information can be a list of objects
                 license_info = 'N/A'
                 license_list = item.get('license', [])
-                if license_list and isinstance(license_list, list) and len(license_list) > 0:
-                    license_info = license_list[0].get('URL', 'N/A')
+                license_info = normalize_string(license_list[0].get('URL', 'N/A') if license_list else 'N/A')
 
                 paper = {
-                    'Title': title,
-                    'Authors': ', '.join(authors),
-                    'Year': year,
-                    'Venue': venue,
+                    'Title': normalize_string(title_list[0] if title_list else 'N/A'),
+                    'Authors': normalize_authors(authors),
+                    'Year': normalize_year(year),
+                    'Venue': normalize_string(venue_list[0] if venue_list else 'N/A'),
                     'Source': self.name,
-                    'Citation Count': item.get('is-referenced-by-count', 0), # CrossRef search doesn't provide citation count
+                    'Citation Count': normalize_citation_count(item.get('is-referenced-by-count', 0)), # CrossRef search doesn't provide citation count
                     'DOI': validate_doi(item.get('DOI')),
                     'License Type': license_info,
                     'URL': item.get('URL')

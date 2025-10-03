@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import GOOGLE_SCHOLAR_RATE_LIMIT
-from ..utils import validate_doi
+from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
 
 try:
     from scholarly import scholarly
@@ -46,14 +46,14 @@ class GoogleScholarSearcher(BaseSearcher):
                     doi = url.split('doi.org/')[-1]
 
                 paper = {
-                    'Title': pub.get('bib', {}).get('title'),
-                    'Authors': pub.get('bib', {}).get('author', ''),
-                    'Year': pub.get('bib', {}).get('pub_year'),
+                    'Title': normalize_string(pub.get('bib', {}).get('title')),
+                    'Authors': normalize_authors(pub.get('bib', {}).get('author', '')),
+                    'Year': normalize_year(pub.get('bib', {}).get('pub_year')),
                     'URL': url,
                     'Source': self.name,
-                    'Citation Count': pub.get('bib', {}).get('num_citations', 'N/A'),
+                    'Citation Count': normalize_citation_count(pub.get('bib', {}).get('num_citations', 'N/A')),
                     'DOI': validate_doi(doi),
-                    'Venue': pub.get('bib', {}).get('journal', ''),
+                    'Venue': normalize_string(pub.get('bib', {}).get('journal', '')),
                     'License Type': 'N/A'
                 }
                 self.results.append(paper)

@@ -4,7 +4,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
 from .base_searcher import BaseSearcher
 from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT, S2_API_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
-from ..utils import validate_doi
+from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
 
 class SemanticScholarSearcher(BaseSearcher):
     """Searcher for the Semantic Scholar API."""
@@ -64,25 +64,27 @@ class SemanticScholarSearcher(BaseSearcher):
             data = response.json()
             
             for item in data.get('data', []):
-                authors = [author.get('name') for author in item.get('authors', [])]
+                authors_list = [author.get('name') for author in item.get('authors', [])]
                 
                 # CORRECTED: Extract DOI from externalIds
                 external_ids = item.get('externalIds', {})
                 doi = external_ids.get('DOI', 'N/A')
                 
                 # Extract license information
+                license_info = 'N/A'
                 open_access_pdf = item.get('openAccessPdf', {})
-                license_info = open_access_pdf.get('license') if open_access_pdf else 'N/A'
+                if open_access_pdf:
+                    license_info = normalize_string(open_access_pdf.get('license'))
 
                 paper = {
-                    'Title': item.get('title'),
-                    'Authors': ', '.join(authors),
-                    'Year': item.get('year'),
+                    'Title': normalize_string(item.get('title')),
+                    'Authors': normalize_authors(authors_list),
+                    'Year': normalize_year(item.get('year')),
                     'URL': item.get('url'),
                     'Source': self.name,
-                    'Citation Count': item.get('citationCount', 0),
+                    'Citation Count': normalize_citation_count(item.get('citationCount', 0)),
                     'DOI': validate_doi(doi),  # Now correctly extracted
-                    'Venue': item.get('venue'),
+                    'Venue': normalize_string(item.get('venue')),
                     'License Type': license_info
                 }
                 self.results.append(paper)

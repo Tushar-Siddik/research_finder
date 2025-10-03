@@ -5,7 +5,7 @@ import requests
 import feedparser
 from .base_searcher import BaseSearcher
 from config import ARXIV_API_URL, REQUEST_TIMEOUT, ARXIV_RATE_LIMIT
-from ..utils import validate_doi
+from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string 
 
 class ArxivSearcher(BaseSearcher):
     """Searcher for the arXiv API."""
@@ -44,20 +44,19 @@ class ArxivSearcher(BaseSearcher):
             feed = feedparser.parse(response.content)
 
             for entry in feed.entries:
-                authors = [author.name for author in entry.authors]
+                authors_list = [author.name for author in entry.authors]
                 arxiv_id = entry.id.split('/')[-1] if entry.id else None
-                license_info = entry.get('rights', 'N/A')
 
                 paper = {
-                    'Title': entry.title,
-                    'Authors': ', '.join(authors),
+                    'Title': normalize_string(entry.title),
+                    'Authors': normalize_authors(authors_list),
                     'Year': entry.published.split('-')[0],
                     'URL': entry.link,
                     'Source': self.name,
                     'Citation Count': 'N/A',
                     'DOI': validate_doi(f"10.48550/arXiv.{arxiv_id}"),
                     'Venue': 'arXiv',
-                    'License Type': license_info
+                    'License Type': normalize_string(entry.get('rights', 'N/A'))
                 }
                 self.results.append(paper)
             

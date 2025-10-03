@@ -10,7 +10,7 @@ from .base_searcher import BaseSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from ..utils import validate_doi
+from ..utils import validate_doi, normalize_authors, normalize_year, normalize_string, normalize_citation_count
 
 try:
     import pyalex
@@ -79,26 +79,26 @@ class OpenAlexSearcher(BaseSearcher):
                 return
 
             for item in results:
-                authors = [
+                authors_list = [
                     authorship.get('author', {}).get('display_name') 
                     for authorship in item.get('authorships', [])
                 ]
                 
                 primary_location = item.get('primary_location') or {}
-                venue = primary_location.get('source', {}).get('display_name', 'N/A')
+                # venue = primary_location.get('source', {}).get('display_name', 'N/A')
                 
                 license_info = 'N/A'
                 oa_location = item.get('best_oa_location')
                 if oa_location and oa_location.get('license'):
-                    license_info = oa_location.get('license')
+                    license_info = normalize_string(oa_location.get('license'))
 
                 paper = {
-                    'Title': item.get('display_name'),
-                    'Authors': ', '.join(authors),
-                    'Year': item.get('publication_year'),
-                    'Venue': venue,
+                    'Title': normalize_string(item.get('display_name')),
+                    'Authors': normalize_authors(authors_list),
+                    'Year': normalize_year(item.get('publication_year')),
+                    'Venue': normalize_string(primary_location.get('source', {}).get('display_name', 'N/A')),
                     'Source': self.name,
-                    'Citation Count': item.get('cited_by_count', 0),
+                    'Citation Count': normalize_citation_count(item.get('cited_by_count', 0)),
                     'DOI': validate_doi(item.get('doi')),
                     'License Type': license_info,
                     'URL': item.get('id')

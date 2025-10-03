@@ -1,3 +1,6 @@
+import re
+
+
 def format_apa7(paper: dict) -> str:
     """
     Formats a paper dictionary into a basic APA-7 style reference string.
@@ -79,3 +82,91 @@ def validate_doi(doi: str) -> str:
         
     # Return the full URL
     return f"https://doi.org/{doi_str}"
+
+def normalize_string(text: str) -> str:
+    """A generic function to clean up string fields."""
+    if not text or str(text).lower() == 'n/a':
+        return 'N/A'
+    
+    # Remove extra whitespace, newlines, and tabs
+    text = re.sub(r'\s+', ' ', str(text))
+    return text.strip()
+
+def normalize_authors(authors_input) -> str:
+    """
+    Normalizes author data from various formats into a clean string.
+    
+    Args:
+        authors_input: Can be a list of strings, a list of dicts with a 'name' key, or a comma-separated string.
+    
+    Returns:
+        A clean, comma-separated string of author names.
+    """
+    if not authors_input:
+        return 'N/A'
+    
+    authors_list = []
+    
+    # Handle list of dictionaries (e.g., from Semantic Scholar)
+    if isinstance(authors_input, list) and authors_input and isinstance(authors_input[0], dict):
+        authors_list = [author.get('name', '').strip() for author in authors_input if author.get('name')]
+    
+    # Handle list of strings (e.g., from arXiv)
+    elif isinstance(authors_input, list):
+        authors_list = [str(author).strip() for author in authors_input if str(author).strip()]
+    
+    # Handle comma-separated string
+    elif isinstance(authors_input, str):
+        authors_list = [author.strip() for author in authors_input.split(',') if author.strip()]
+
+    # Filter out any empty entries that might have slipped through
+    clean_authors = [author for author in authors_list if author]
+    
+    return ', '.join(clean_authors) if clean_authors else 'N/A'
+
+def normalize_year(year_input) -> str:
+    """
+    Normalizes year data from various formats into a 4-digit string.
+    
+    Args:
+        year_input: Can be an integer, a 4-digit string, or a full date string.
+    
+    Returns:
+        A 4-digit string or 'N/A'.
+    """
+    if not year_input or str(year_input).lower() == 'n/a':
+        return 'N/A'
+    
+    # Extract just the 4-digit year if it's in a string
+    match = re.search(r'\b(19|20)\d{2}\b', str(year_input))
+    if match:
+        return match.group(0)
+    
+    # If it's already a 4-digit number, return it as a string
+    if str(year_input).isdigit() and len(str(year_input)) == 4:
+        return str(year_input)
+        
+    return 'N/A'
+
+def normalize_citation_count(count_input) -> int:
+    """
+    Normalizes citation count to an integer.
+    
+    Args:
+        count_input: Can be an integer or a string.
+    
+    Returns:
+        An integer, or 0 if the input is invalid.
+    """
+    if not count_input or str(count_input).lower() == 'n/a':
+        return 0
+    
+    try:
+        # Extract the first number found in the string
+        match = re.search(r'\d+', str(count_input))
+        if match:
+            return int(match.group(0))
+    except (ValueError, TypeError):
+        return 0
+        
+    return 0
