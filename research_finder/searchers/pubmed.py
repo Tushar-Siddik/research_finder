@@ -143,10 +143,16 @@ class PubmedSearcher(BaseSearcher):
                 
                 # Construct the PubMed URL
                 pmid = article.find('MedlineCitation').get('PMID')
-                url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                if pmid:
+                    url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                    # Fetch citation count safely
+                    citation_count = self._fetch_citation_count(pmid)
+                else:
+                    url = 'N/A'
+                    citation_count = 'N/A'
 
                 # Fetch citation count safely
-                citation_count = self._fetch_citation_count(pmid)
+                # citation_count = self._fetch_citation_count(pmid)
 
                 paper = {
                     'Title': normalize_string(title_elem.text if title_elem is not None else 'N/A'),
