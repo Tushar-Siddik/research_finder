@@ -125,7 +125,11 @@ def format_apa7(paper: dict) -> str:
 
     # 3. Format Title (Sentence Case)
     title = _to_sentence_case(paper.get('Title', ''))
-    title_str = f"{title}."
+    # Only add a period if the title doesn't already end with one
+    if not title.endswith('.'):
+        title_str = f"{title}."
+    else:
+        title_str = title
 
     # 4. Format Journal, Volume, Issue, Pages
     venue_info = _parse_venue_info(paper.get('Venue', ''))
