@@ -4,6 +4,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
 from .base_searcher import BaseSearcher
 from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT, S2_API_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
+from ..utils import validate_doi
 
 class SemanticScholarSearcher(BaseSearcher):
     """Searcher for the Semantic Scholar API."""
@@ -80,7 +81,7 @@ class SemanticScholarSearcher(BaseSearcher):
                     'URL': item.get('url'),
                     'Source': self.name,
                     'Citation Count': item.get('citationCount', 0),
-                    'DOI': doi,  # Now correctly extracted
+                    'DOI': validate_doi(doi),  # Now correctly extracted
                     'Venue': item.get('venue'),
                     'License Type': license_info
                 }

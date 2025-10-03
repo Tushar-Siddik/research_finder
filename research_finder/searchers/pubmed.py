@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import PUBMED_ESEARCH_URL, PUBMED_EFETCH_URL, REQUEST_TIMEOUT, PUBMED_API_KEY, PUBMED_RATE_LIMIT_WITH_KEY, PUBMED_RATE_LIMIT_NO_KEY
+from ..utils import validate_doi
 
 class PubmedSearcher(BaseSearcher):
     """Searcher for the PubMed API (Entrez) with an API key."""
@@ -146,7 +147,7 @@ class PubmedSearcher(BaseSearcher):
                     'Venue': venue,
                     'Source': self.name,
                     'Citation Count': 'N/A',    # Not available in standard fetch
-                    'DOI': doi,
+                    'DOI': validate_doi(doi),
                     'License Type': license_info,
                     'URL': url
                 }

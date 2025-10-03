@@ -57,20 +57,25 @@ def format_apa7(paper: dict) -> str:
             
     return ref.strip()
 
-# def validate_doi(doi: str) -> str:
-#     """Validate and format a DOI."""
-#     if not doi or doi == 'N/A':
-#         return 'N/A'
+def validate_doi(doi: str) -> str:
+    """
+    Validates and formats a DOI to a consistent URL.
     
-#     # Remove any leading/trailing whitespace
-#     doi = doi.strip()
+    Args:
+        doi: The DOI string from an API, which may be in various formats.
+        
+    Returns:
+        A full, validated DOI URL (e.g., "https://doi.org/10.1000/xyz123"), 
+        or 'N/A' if the input is invalid or empty.
+    """
+    if not doi or not str(doi).strip() or str(doi).lower() == 'n/a':
+        return 'N/A'
     
-#     # If DOI doesn't start with the proper prefix, add it
-#     if not doi.startswith('10.'):
-#         return 'N/A'
+    doi_str = str(doi).strip()
     
-#     # If DOI doesn't have the doi.org prefix, add it
-#     if not doi.startswith('https://doi.org/'):
-#         return f"https://doi.org/{doi}"
-    
-#     return doi
+    # A basic check for the DOI prefix (e.g., "10.1000")
+    if not doi_str.startswith('10.'):
+        return 'N/A'
+        
+    # Return the full URL
+    return f"https://doi.org/{doi_str}"

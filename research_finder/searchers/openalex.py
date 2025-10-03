@@ -10,6 +10,7 @@ from .base_searcher import BaseSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
+from ..utils import validate_doi
 
 try:
     import pyalex
@@ -98,7 +99,7 @@ class OpenAlexSearcher(BaseSearcher):
                     'Venue': venue,
                     'Source': self.name,
                     'Citation Count': item.get('cited_by_count', 0),
-                    'DOI': item.get('doi'),
+                    'DOI': validate_doi(item.get('doi')),
                     'License Type': license_info,
                     'URL': item.get('id')
                 }

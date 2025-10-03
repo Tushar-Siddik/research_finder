@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_MAILTO, CROSSREF_RATE_LIMIT_WITH_KEY, CROSSREF_RATE_LIMIT_NO_KEY
+from ..utils import validate_doi
 
 class CrossrefSearcher(BaseSearcher):
     """Searcher for the CrossRef API."""
@@ -94,7 +95,7 @@ class CrossrefSearcher(BaseSearcher):
                     'Venue': venue,
                     'Source': self.name,
                     'Citation Count': 'N/A', # CrossRef search doesn't provide citation count
-                    'DOI': item.get('DOI'),
+                    'DOI': validate_doi(item.get('DOI')),
                     'License Type': license_info,
                     'URL': item.get('URL')
                 }

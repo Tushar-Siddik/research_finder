@@ -2,7 +2,8 @@ from .base_searcher import BaseSearcher
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from config import REQUEST_TIMEOUT, GOOGLE_SCHOLAR_RATE_LIMIT
+from config import GOOGLE_SCHOLAR_RATE_LIMIT
+from ..utils import validate_doi
 
 try:
     from scholarly import scholarly
@@ -51,7 +52,7 @@ class GoogleScholarSearcher(BaseSearcher):
                     'URL': url,
                     'Source': self.name,
                     'Citation Count': pub.get('bib', {}).get('num_citations', 'N/A'),
-                    'DOI': doi,
+                    'DOI': validate_doi(doi),
                     'Venue': pub.get('bib', {}).get('journal', ''),
                     'License Type': 'N/A'
                 }
