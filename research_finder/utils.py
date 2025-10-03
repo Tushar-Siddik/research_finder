@@ -30,21 +30,35 @@ def clean_author_list(authors_input) -> str:
     return ', '.join(clean_authors) if clean_authors else 'N/A'
 
 def _to_sentence_case(text: str) -> str:
-    """Converts a string to sentence case (APA 7 style for article titles)."""
+    """
+    Converts a string to sentence case (APA 7 style for article titles).
+    Handles colons, question marks, and exclamation points.
+    """
     if not text or text == 'N/A':
         return 'N/A'
+    
     text = text.strip()
-    # Capitalize the first letter
-    text = text[0].upper() + text[1:]
-    # Lowercase the rest, then capitalize words after a colon
-    parts = text.split(':')
-    for i in range(len(parts)):
-        parts[i] = parts[i].strip().lower()
-        if i == 0:
-            parts[i] = parts[i][0].upper() + parts[i][1:]
-        else:
-            parts[i] = parts[i][0].upper() + parts[i][1:]
-    return ': '.join(parts)
+    
+    # Split the title by common punctuation marks that separate clauses
+    # We use a non-capturing group (?:...) to split but keep the delimiter
+    parts = re.split(r'([:?!])', text)
+    
+    # Reconstruct the parts with correct capitalization
+    capitalized_parts = []
+    for i in range(0, len(parts), 2): # Iterate over the text parts, not the delimiters
+        part = parts[i].strip()
+        if not part:
+            continue
+        
+        # Capitalize the first letter of the part
+        part = part[0].upper() + part[1:].lower()
+        capitalized_parts.append(part)
+        
+        # Add the delimiter back if it exists
+        if i + 1 < len(parts):
+            capitalized_parts.append(parts[i+1])
+            
+    return "".join(capitalized_parts)
 
 def _to_title_case(text: str) -> str:
     """Converts a string to title case (APA 7 style for journal titles)."""
@@ -56,6 +70,9 @@ def _to_title_case(text: str) -> str:
 def _parse_venue_info(venue_str: str) -> dict:
     """
     Tries to parse a complex venue string into journal, volume, issue, and pages.
+    
+    NOTE: This is a best-effort parser using a regular expression to handle common formats.
+    It may not successfully parse every possible venue string format from all APIs.
     Example input: "Psycho-Oncology, 13(6), 408-428"
     """
     if not venue_str or venue_str == 'N/A':
