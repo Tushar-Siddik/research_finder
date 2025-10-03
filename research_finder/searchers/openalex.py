@@ -21,7 +21,7 @@ except ImportError:
 
 # Try to import from config to overwrite defaults
 try:
-    from config import OPENALEX_EMAIL
+    from config import OPENALEX_EMAIL, OPENALEX_RATE_LIMIT_WITH_EMAIL, OPENALEX_RATE_LIMIT_NO_EMAIL
 except ImportError:
     logging.warning("Could not import OPENALEX_EMAIL from config.py. Using default value.")
     OPENALEX_EMAIL = ""
@@ -39,10 +39,10 @@ class OpenAlexSearcher(BaseSearcher):
         if self._check_api_key("OpenAlex 'polite pool' email", OPENALEX_EMAIL):
             pyalex.config.email = OPENALEX_EMAIL
             # With an email, we can be more aggressive
-            self.rate_limit = 0.1  # 10 requests per second
+            self.rate_limit = OPENALEX_RATE_LIMIT_WITH_EMAIL  # 10 requests per second
         else:
             # Without an email, we should be more conservative
-            self.rate_limit = 0.5  # 2 requests per second
+            self.rate_limit = OPENALEX_RATE_LIMIT_NO_EMAIL  # 2 requests per second
     
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")

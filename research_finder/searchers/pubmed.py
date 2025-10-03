@@ -4,7 +4,7 @@ from .base_searcher import BaseSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from config import PUBMED_ESEARCH_URL, PUBMED_EFETCH_URL, REQUEST_TIMEOUT, PUBMED_RATE_LIMIT, PUBMED_API_KEY
+from config import PUBMED_ESEARCH_URL, PUBMED_EFETCH_URL, REQUEST_TIMEOUT, PUBMED_API_KEY, PUBMED_RATE_LIMIT_WITH_KEY, PUBMED_RATE_LIMIT_NO_KEY
 
 class PubmedSearcher(BaseSearcher):
     """Searcher for the PubMed API (Entrez) with an API key."""
@@ -16,10 +16,10 @@ class PubmedSearcher(BaseSearcher):
         # Use the new check method and adjust rate limit accordingly
         if self._check_api_key("PubMed API key", self.api_key):
             # With an API key, the limit is 10 requests per second
-            self.rate_limit = 0.1  # 1/10 = 0.1s between requests
+            self.rate_limit = PUBMED_RATE_LIMIT_WITH_KEY  # 0.1: 1/10 = 0.1s between requests
         else:
             # Without a key, the limit is 3 requests per second
-            self.rate_limit = 0.33 # ~1/3 = 0.33s between requests
+            self.rate_limit = PUBMED_RATE_LIMIT_NO_KEY  # 0.33: ~1/3 = 0.33s between requests
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")

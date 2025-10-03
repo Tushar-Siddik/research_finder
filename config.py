@@ -11,7 +11,8 @@ PROJECT_ROOT = Path(__file__).parent.absolute()
 # Semantic Scholar API settings
 S2_API_KEY = os.getenv("S2_API_KEY", "")
 SEMANTIC_SCHOLAR_API_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
-SEMANTIC_SCHOLAR_RATE_LIMIT = 1.0  # 1 request per second
+SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY = 1.0  # 1 request per second
+SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY = 0.1    # 1 request per 10 seconds
 
 # ARXIV API settings
 ARXIV_API_URL = "http://export.arxiv.org/api/query"
@@ -39,7 +40,8 @@ OPENALEX_RATE_LIMIT_NO_EMAIL = 0.5  # 2 requests per second without email
 
 # CrossRef API settings
 CROSSREF_API_URL = "https://api.crossref.org/works"
-CROSSREF_RATE_LIMIT = 1.0  # 1 request per second (be polite)
+CROSSREF_RATE_LIMIT_WITH_KEY = 1.0  # 1 request per second (be polite)
+CROSSREF_RATE_LIMIT_NO_KEY = 2.0    # 1 request per 2 seconds (be polite)
 CROSSREF_MAILTO = os.getenv("CROSSREF_MAILTO", "")  # Optional but recommended for better rate limits
 
 # Default settings

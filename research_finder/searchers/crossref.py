@@ -4,7 +4,7 @@ from .base_searcher import BaseSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_RATE_LIMIT, CROSSREF_MAILTO
+from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_MAILTO, CROSSREF_RATE_LIMIT_WITH_KEY, CROSSREF_RATE_LIMIT_NO_KEY
 
 class CrossrefSearcher(BaseSearcher):
     """Searcher for the CrossRef API."""
@@ -18,10 +18,10 @@ class CrossrefSearcher(BaseSearcher):
         # CrossRef uses a 'mailto' for its polite pool.
         if self._check_api_key("CrossRef 'mailto' email", self.mailto):
             # The polite pool has a higher limit.
-            self.rate_limit = 1.0  # 1 request per second
+            self.rate_limit = CROSSREF_RATE_LIMIT_WITH_KEY  # 1: 1 request per second
         else:
             # We should be extra polite if not identifying ourselves.
-            self.rate_limit = 2.0  # 1 request every 2 seconds
+            self.rate_limit = CROSSREF_RATE_LIMIT_NO_KEY  # 1 request every 2 seconds
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")

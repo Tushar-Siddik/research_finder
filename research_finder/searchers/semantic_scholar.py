@@ -3,7 +3,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
 from .base_searcher import BaseSearcher
-from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT, S2_API_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT
+from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT, S2_API_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
 
 class SemanticScholarSearcher(BaseSearcher):
     """Searcher for the Semantic Scholar API."""
@@ -18,10 +18,10 @@ class SemanticScholarSearcher(BaseSearcher):
         # Use the new check method and adjust rate limit accordingly
         if self._check_api_key("Semantic Scholar API key", self.api_key):
             # With an API key, you can make more requests per second
-            self.rate_limit = 1.0  # 1 request per second
+            self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY  # 1: 1 request per second
         else:
             # Without a key, the rate limit is much lower
-            self.rate_limit = 0.1  # 1 request per 10 seconds
+            self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY  # 1 request per 10 seconds
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
