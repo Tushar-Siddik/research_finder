@@ -133,7 +133,6 @@ def get_searcher_selection():
         except (ValueError, IndexError):
             print("Invalid input. Please enter numbers separated by commas (e.g., 1,3).")
 
-
 def main():
     """Main function to run the research finder tool."""
     setup_logging()
@@ -168,7 +167,6 @@ def main():
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
     # 6. Run Searches and Get Results
-    # Use streaming for large searches to avoid memory issues
     all_articles = aggregator.run_all_searches(query, limit, stream=True)
 
     # 7. Export Results
@@ -176,6 +174,19 @@ def main():
         exporter.to_csv(all_articles, output_file)
     else:
         logger.info("No articles found to export.")
+
+    # 8. Display the Error Recovery Summary
+    print("\n--- Search Summary ---")
+    summary = aggregator.get_last_run_summary()
+    
+    if summary['successful']:
+        print(f"Successfully searched: {', '.join(summary['successful'])}")
+    
+    if summary['failed']:
+        print(f"Failed to search: {', '.join(summary['failed'])}")
+        print("Please check your API keys or network connection for the failed sources.")
+        
+    print("----------------------\n")
         
 if __name__ == "__main__":
     main()

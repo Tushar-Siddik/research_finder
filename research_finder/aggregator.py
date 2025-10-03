@@ -1,7 +1,6 @@
 from pathlib import Path
-
 import logging
-from typing import List, Iterator, Union
+from typing import List, Iterator, Union, Dict
 from .searchers.base_searcher import BaseSearcher
 from .cache import CacheManager
 import sys
@@ -14,14 +13,16 @@ class Aggregator:
     def __init__(self):
         self.searchers: List[BaseSearcher] = []
         self.logger = logging.getLogger("Aggregator")
-        # Initialize cache manager
         self.cache_manager = CacheManager(CACHE_DIR, CACHE_EXPIRY_HOURS)
         self.logger.info(f"Cache initialized at {CACHE_DIR} with expiry of {CACHE_EXPIRY_HOURS} hours")
+        
+        # --- ADD THESE INSTANCE VARIABLES ---
+        self.last_successful_searchers: List[str] = []
+        self.last_failed_searchers: List[str] = []
 
     def add_searcher(self, searcher: BaseSearcher) -> None:
         """Adds a searcher instance to the list."""
         if isinstance(searcher, BaseSearcher):
-            # Set the cache manager for the searcher
             searcher.cache_manager = self.cache_manager
             self.searchers.append(searcher)
             self.logger.info(f"Added searcher: {searcher.name}")
@@ -31,20 +32,15 @@ class Aggregator:
     def run_all_searches(self, query: str, limit: int, stream: bool = False) -> Union[List[dict], Iterator[dict]]:
         """
         Runs the search query on all added searchers.
-        
-        Args:
-            query: Search query string.
-            limit: Max results per source.
-            stream: If True, returns a generator to avoid high memory usage.
-        
-        Returns:
-            A list of all results, or a generator if stream=True.
         """
         self.logger.info(f"--- Starting search for '{query}' ---")
+        
+        # --- RESET TRACKING VARIABLES FOR EACH RUN ---
+        self.last_successful_searchers = []
+        self.last_failed_searchers = []
+        
         seen_titles = set()
         seen_dois = set()
-        successful_searchers = []
-        failed_searchers = []
 
         if stream:
             def result_generator():
@@ -53,6 +49,7 @@ class Aggregator:
                     try:
                         searcher.search(query, limit)
                         for result in searcher.get_results():
+                            # ... (deduplication logic) ...
                             title = result.get('Title', '').lower().strip()
                             doi = result.get('DOI', '').lower().strip()
                             
@@ -62,27 +59,24 @@ class Aggregator:
                                 if doi != 'n/a':
                                     seen_dois.add(doi)
                                 yield result
-                        successful_searchers.append(searcher.name)
+                        # --- TRACK SUCCESS ---
+                        self.last_successful_searchers.append(searcher.name)
                     except Exception as e:
                         self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}")
-                        failed_searchers.append(searcher.name)
+                        # --- TRACK FAILURE ---
+                        self.last_failed_searchers.append(searcher.name)
                 
-                # Log summary at the end of the generator
-                self.logger.info(f"--- Search complete. ---")
-                if successful_searchers:
-                    self.logger.info(f"Successfully searched: {', '.join(successful_searchers)}")
-                if failed_searchers:
-                    self.logger.warning(f"Failed to search: {', '.join(failed_searchers)}")
-
+                self.logger.info("--- Search complete. ---")
             return result_generator()
         else:
-            # Original implementation for backward compatibility
+            # Original implementation
             all_results = []
             for searcher in self.searchers:
                 self.logger.info(f"Searching {searcher.name}...")
                 try:
                     searcher.search(query, limit)
                     for result in searcher.get_results():
+                        # ... (deduplication logic) ...
                         title = result.get('Title', '').lower().strip()
                         doi = result.get('DOI', '').lower().strip()
                         
@@ -92,19 +86,27 @@ class Aggregator:
                             if doi != 'n/a':
                                 seen_dois.add(doi)
                             all_results.append(result)
-                    successful_searchers.append(searcher.name)
+                    # --- TRACK SUCCESS ---
+                    self.last_successful_searchers.append(searcher.name)
                 except Exception as e:
                     self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}")
-                    failed_searchers.append(searcher.name)
+                    # --- TRACK FAILURE ---
+                    self.last_failed_searchers.append(searcher.name)
             
-            # Log summary
             self.logger.info(f"--- Search complete. Total unique results found: {len(all_results)} ---")
-            if successful_searchers:
-                self.logger.info(f"Successfully searched: {', '.join(successful_searchers)}")
-            if failed_searchers:
-                self.logger.warning(f"Failed to search: {', '.join(failed_searchers)}")
-            
             return all_results
+
+    def get_last_run_summary(self) -> Dict[str, List[str]]:
+        """
+        Returns a summary of the last search run.
+        
+        Returns:
+            A dictionary with keys 'successful' and 'failed' containing lists of searcher names.
+        """
+        return {
+            'successful': self.last_successful_searchers,
+            'failed': self.last_failed_searchers
+        }
     
     def clear_cache(self) -> None:
         """Clear all cached search results."""
