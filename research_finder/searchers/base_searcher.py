@@ -8,7 +8,7 @@ class BaseSearcher(ABC):
         self.name = name
         self.results: List[Dict[str, Any]] = []
         self.cache_manager = cache_manager
-
+    
     @abstractmethod
     def search(self, query: str, limit: int) -> None:
         """
@@ -16,6 +16,13 @@ class BaseSearcher(ABC):
         Each result should be a dictionary.
         """
         pass
+    
+    # def check_api_key(self, key_name: str, key_value: str) -> bool:
+    #     """Check if an API key is available and log a warning if not."""
+    #     if not key_value:
+    #         self.logger.warning(f"No {key_name} provided. Some features may not work correctly.")
+    #         return False
+    #     return True
 
     def get_results(self) -> List[Dict[str, Any]]:
         """Returns the list of standardized results."""
