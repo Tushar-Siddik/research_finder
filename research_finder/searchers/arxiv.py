@@ -36,7 +36,7 @@ class ArxivSearcher(BaseSearcher):
             'max_results': limit
         }
         
-        # Use the inherited rate limiting method
+        # Enforce rate limit BEFORE the request
         self._enforce_rate_limit()
         
         try:
