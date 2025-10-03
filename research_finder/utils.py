@@ -56,3 +56,21 @@ def format_apa7(paper: dict) -> str:
             ref += f" {url}"
             
     return ref.strip()
+
+# def validate_doi(doi: str) -> str:
+#     """Validate and format a DOI."""
+#     if not doi or doi == 'N/A':
+#         return 'N/A'
+    
+#     # Remove any leading/trailing whitespace
+#     doi = doi.strip()
+    
+#     # If DOI doesn't start with the proper prefix, add it
+#     if not doi.startswith('10.'):
+#         return 'N/A'
+    
+#     # If DOI doesn't have the doi.org prefix, add it
+#     if not doi.startswith('https://doi.org/'):
+#         return f"https://doi.org/{doi}"
+    
+#     return doi
