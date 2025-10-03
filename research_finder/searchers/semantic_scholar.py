@@ -1,9 +1,8 @@
 import time
-import requests
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
-
+import requests
 import logging
 from .base_searcher import BaseSearcher
 from config import SEMANTIC_SCHOLAR_API_URL, REQUEST_TIMEOUT, S2_API_KEY, SEMANTIC_SCHOLAR_RATE_LIMIT
@@ -12,18 +11,19 @@ class SemanticScholarSearcher(BaseSearcher):
     """Searcher for the Semantic Scholar API."""
     
     BASE_URL = SEMANTIC_SCHOLAR_API_URL
-    _last_request_time = 0  # Class variable to track last request time
+    # The class variable for _last_request_time is now removed and handled by the base class
 
     def __init__(self, cache_manager=None):
         super().__init__("Semantic Scholar", cache_manager)
-        self.logger = logging.getLogger(self.name)
         self.api_key = S2_API_KEY
-        self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT
         
-        if self.api_key:
-            self.logger.info(f"Using Semantic Scholar API key with rate limit of {self.rate_limit} request(s) per second")
+        # Use the new check method and adjust rate limit accordingly
+        if self._check_api_key("Semantic Scholar API key", self.api_key):
+            # With an API key, you can make more requests per second
+            self.rate_limit = 1.0  # 1 request per second
         else:
-            self.logger.warning("No Semantic Scholar API key found. Using unauthenticated requests with lower rate limits.")
+            # Without a key, the rate limit is much lower
+            self.rate_limit = 0.1  # 1 request per 10 seconds
 
     def _enforce_rate_limit(self):
         """Ensure we don't exceed the rate limit."""
