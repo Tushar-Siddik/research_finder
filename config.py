@@ -30,6 +30,8 @@ PUBMED_RATE_LIMIT = 0.1  # 10 requests per second with API key (1/10 = 0.1s betw
 # # https://github.com/J535D165/pyalex
 # OPENALEX_API_URL = "https://api.openalex.org/works"
 # OPENALEX_RATE_LIMIT = 0.1  # 10 requests per second (conservative, OpenAlex allows much more)
+# OpenAlex API settings
+OPENALEX_EMAIL = os.getenv("OPENALEX_EMAIL", "")
 
 # CrossRef API settings
 CROSSREF_API_URL = "https://api.crossref.org/works"
@@ -51,6 +53,3 @@ DEFAULT_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 # Logging settings
 LOG_LEVEL = "INFO"
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
-# Environment variables
-S2_API_KEY = os.getenv("S2_API_KEY", "")
