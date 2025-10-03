@@ -11,10 +11,11 @@ class BaseSearcher(ABC):
         self.results: List[Dict[str, Any]] = []
         self.cache_manager = cache_manager
         self.logger = logging.getLogger(self.name)
-        # Use an instance variable for rate limiting
+        
+        # Instance variable to track the last request time for this specific searcher instance.
         self._last_request_time = 0
-        # Default rate limit, can be overridden by subclasses
-        self.rate_limit = 1.0 
+        # A default rate limit. Subclasses MUST override this in their __init__ method.
+        self.rate_limit = 1.0
 
     @abstractmethod
     def search(self, query: str, limit: int) -> None:
@@ -49,7 +50,10 @@ class BaseSearcher(ABC):
         return True
 
     def _enforce_rate_limit(self):
-        """Ensure we don't exceed the rate limit."""
+        """
+        Pauses execution if necessary to ensure we don't exceed the configured rate limit.
+        This method should be called before making any network request.
+        """
         current_time = time.time()
         time_since_last_request = current_time - self._last_request_time
         
@@ -58,4 +62,5 @@ class BaseSearcher(ABC):
             self.logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
             time.sleep(sleep_time)
         
+        # Update the last request time to now
         self._last_request_time = time.time()
