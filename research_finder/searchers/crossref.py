@@ -14,7 +14,7 @@ class CrossrefSearcher(BaseSearcher):
     def __init__(self, cache_manager=None):
         super().__init__("CrossRef", cache_manager)
         self.mailto = CROSSREF_MAILTO
-        self._check_api_key("CrossRef 'mailto' email", self.mailto)
+
         # CrossRef uses a 'mailto' for its polite pool.
         if self._check_api_key("CrossRef 'mailto' email", self.mailto):
             # The polite pool has a higher limit.
