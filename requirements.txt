@@ -4,3 +4,4 @@ feedparser
 scholarly
 python-dotenv
 pyalex
+tqdm

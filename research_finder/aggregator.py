@@ -3,6 +3,7 @@ import logging
 from typing import List, Iterator, Union, Dict
 from .searchers.base_searcher import BaseSearcher
 from .cache import CacheManager
+from tqdm import tqdm  # <-- Import tqdm
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import CACHE_DIR, CACHE_EXPIRY_HOURS
@@ -16,7 +17,6 @@ class Aggregator:
         self.cache_manager = CacheManager(CACHE_DIR, CACHE_EXPIRY_HOURS)
         self.logger.info(f"Cache initialized at {CACHE_DIR} with expiry of {CACHE_EXPIRY_HOURS} hours")
         
-        # --- ADD THESE INSTANCE VARIABLES ---
         self.last_successful_searchers: List[str] = []
         self.last_failed_searchers: List[str] = []
 
@@ -29,86 +29,65 @@ class Aggregator:
         else:
             self.logger.error(f"Failed to add searcher: {searcher} is not a valid BaseSearcher instance.")
     
-    def run_all_searches(self, query: str, limit: int, stream: bool = False) -> Union[List[dict], Iterator[dict]]:
+    def _process_searchers(self, query: str, limit: int) -> Iterator[dict]:
         """
-        Runs the search query on all added searchers.
+        Internal helper to iterate through searchers, find articles, and yield results.
+        This method contains the core logic for searching and deduplication.
         """
-        self.logger.info(f"--- Starting search for '{query}' ---")
-        
-        # --- RESET TRACKING VARIABLES FOR EACH RUN ---
         self.last_successful_searchers = []
         self.last_failed_searchers = []
         
         seen_dois = set()
         seen_titles_without_doi = set()
 
-        if stream:
-            def result_generator():
-                for searcher in self.searchers:
-                    self.logger.info(f"Searching {searcher.name}...")
-                    try:
-                        searcher.search(query, limit)
-                        for result in searcher.get_results():
-                            # ... (deduplication logic) ...
-                            doi = result.get('DOI', '').lower().strip()
-                            title = result.get('Title', '').lower().strip()
-
-                            is_duplicate = False
-                            if doi and doi != 'n/a':
-                                if doi in seen_dois:
-                                    is_duplicate = True
-                                else:
-                                    seen_dois.add(doi)
-                            else: # No DOI available
-                                if title in seen_titles_without_doi:
-                                    is_duplicate = True
-                                else:
-                                    seen_titles_without_doi.add(title)
-                            
-                            if not is_duplicate:
-                                yield result
-                        # --- TRACK SUCCESS ---
-                        self.last_successful_searchers.append(searcher.name)
-                    except Exception as e:
-                        self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}")
-                        # --- TRACK FAILURE ---
-                        self.last_failed_searchers.append(searcher.name)
-                
-                self.logger.info("--- Search complete. ---")
-            return result_generator()
-        else:
-            # Original implementation
-            all_results = []
-            for searcher in self.searchers:
-                self.logger.info(f"Searching {searcher.name}...")
-                try:
-                    searcher.search(query, limit)
-                    for result in searcher.get_results():
-                        # ... (deduplication logic) ...
-                        doi = result.get('DOI', '').lower().strip()
-                        title = result.get('Title', '').lower().strip()
-
-                        is_duplicate = False
-                        if doi and doi != 'n/a':
-                            if doi in seen_dois:
-                                is_duplicate = True
-                            else:
-                                seen_dois.add(doi)
-                        else: # No DOI available
-                            if title in seen_titles_without_doi:
-                                is_duplicate = True
-                            else:
-                                seen_titles_without_doi.add(title)
-                        
-                        if not is_duplicate:
-                            all_results.append(result)
-                    # --- TRACK SUCCESS ---
-                    self.last_successful_searchers.append(searcher.name)
-                except Exception as e:
-                    self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}")
-                    # --- TRACK FAILURE ---
-                    self.last_failed_searchers.append(searcher.name)
+        # Create a progress bar. 'desc' is the description, 'unit' is the unit of iteration.
+        pbar = tqdm(self.searchers, desc="Searching Vendors", unit="source", file=sys.stdout)
+        
+        for searcher in pbar:
+            # Update the progress bar's description to show the current source
+            pbar.set_postfix_str(f"Current: {searcher.name}")
             
+            try:
+                searcher.search(query, limit)
+                for result in searcher.get_results():
+                    doi = result.get('DOI', '').lower().strip()
+                    title = result.get('Title', '').lower().strip()
+
+                    is_duplicate = False
+                    if doi and doi != 'n/a':
+                        if doi in seen_dois:
+                            is_duplicate = True
+                        else:
+                            seen_dois.add(doi)
+                    else: # No DOI available
+                        if title in seen_titles_without_doi:
+                            is_duplicate = True
+                        else:
+                            seen_titles_without_doi.add(title)
+                    
+                    if not is_duplicate:
+                        yield result
+                
+                self.last_successful_searchers.append(searcher.name)
+
+            except Exception as e:
+                self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}")
+                self.last_failed_searchers.append(searcher.name)
+        
+        pbar.close()
+
+    def run_all_searches(self, query: str, limit: int, stream: bool = False) -> Union[List[dict], Iterator[dict]]:
+        """
+        Runs the search query on all added searchers.
+        """
+        self.logger.info(f"--- Starting search for '{query}' across {len(self.searchers)} vendors ---")
+
+        if stream:
+            # For streaming, we just return the generator directly
+            return self._process_searchers(query, limit)
+        else:
+            # For non-streaming, we consume the generator into a list
+            all_results = list(self._process_searchers(query, limit))
             self.logger.info(f"--- Search complete. Total unique results found: {len(all_results)} ---")
             return all_results
 
