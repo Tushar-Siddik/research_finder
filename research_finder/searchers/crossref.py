@@ -98,7 +98,7 @@ class CrossrefSearcher(BaseSearcher):
                     'Year': normalize_year(year),
                     'Venue': normalize_string(venue_list[0] if venue_list else 'N/A'),
                     'Source': self.name,
-                    'Citation Count': normalize_citation_count(item.get('is-referenced-by-count', 0)), # CrossRef search doesn't provide citation count
+                    'Citation Count': normalize_citation_count(item.get('is-referenced-by-count', 0)),
                     'DOI': validate_doi(item.get('DOI')),
                     'License Type': license_info,
                     'URL': item.get('URL')

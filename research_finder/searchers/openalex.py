@@ -23,9 +23,12 @@ except ImportError:
 # Try to import from config to overwrite defaults
 try:
     from config import OPENALEX_EMAIL, OPENALEX_RATE_LIMIT_WITH_EMAIL, OPENALEX_RATE_LIMIT_NO_EMAIL
-except ImportError:
-    logging.warning("Could not import OPENALEX_EMAIL from config.py. Using default value.")
+except Exception as e:
+    logging.warning(f"Could not import OpenAlex config from config.py. Using default values. Error: {e}")
     OPENALEX_EMAIL = ""
+    # Define fallback defaults if config import fails
+    OPENALEX_RATE_LIMIT_WITH_EMAIL = 0.1  # 10 requests per second
+    OPENALEX_RATE_LIMIT_NO_EMAIL = 0.5   # 2 requests per second
 
 class OpenAlexSearcher(BaseSearcher):
     """Searcher for the OpenAlex API using the pyalex package."""

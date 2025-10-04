@@ -105,7 +105,7 @@ class PubmedSearcher(BaseSearcher):
                 article_data = article.find('MedlineCitation').find('Article')
                 
                 title_elem = article_data.find('ArticleTitle')
-                # title = itle_elem.text if title_elem is not None else 'N/A'
+                # title = title_elem.text if title_elem is not None else 'N/A'
                 
                 authors = []
                 for author in article_data.findall('.//Author'):

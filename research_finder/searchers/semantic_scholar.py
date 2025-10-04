@@ -66,9 +66,11 @@ class SemanticScholarSearcher(BaseSearcher):
             for item in data.get('data', []):
                 authors_list = [author.get('name') for author in item.get('authors', [])]
                 
-                # CORRECTED: Extract DOI from externalIds
-                external_ids = item.get('externalIds', {})
-                doi = external_ids.get('DOI', 'N/A')
+                # Correctly and safely extract DOI from externalIds
+                doi = 'N/A'
+                external_ids = item.get('externalIds')
+                if isinstance(external_ids, dict):
+                    doi = external_ids.get('DOI', 'N/A')
                 
                 # Extract license information
                 license_info = 'N/A'

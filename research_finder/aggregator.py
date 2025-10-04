@@ -39,8 +39,8 @@ class Aggregator:
         self.last_successful_searchers = []
         self.last_failed_searchers = []
         
-        seen_titles = set()
         seen_dois = set()
+        seen_titles_without_doi = set()
 
         if stream:
             def result_generator():
@@ -50,14 +50,22 @@ class Aggregator:
                         searcher.search(query, limit)
                         for result in searcher.get_results():
                             # ... (deduplication logic) ...
-                            title = result.get('Title', '').lower().strip()
                             doi = result.get('DOI', '').lower().strip()
-                            
-                            if (title and title not in seen_titles) and \
-                               (doi not in seen_dois or doi == 'n/a'):
-                                seen_titles.add(title)
-                                if doi != 'n/a':
+                            title = result.get('Title', '').lower().strip()
+
+                            is_duplicate = False
+                            if doi and doi != 'n/a':
+                                if doi in seen_dois:
+                                    is_duplicate = True
+                                else:
                                     seen_dois.add(doi)
+                            else: # No DOI available
+                                if title in seen_titles_without_doi:
+                                    is_duplicate = True
+                                else:
+                                    seen_titles_without_doi.add(title)
+                            
+                            if not is_duplicate:
                                 yield result
                         # --- TRACK SUCCESS ---
                         self.last_successful_searchers.append(searcher.name)
@@ -77,14 +85,22 @@ class Aggregator:
                     searcher.search(query, limit)
                     for result in searcher.get_results():
                         # ... (deduplication logic) ...
-                        title = result.get('Title', '').lower().strip()
                         doi = result.get('DOI', '').lower().strip()
-                        
-                        if (title and title not in seen_titles) and \
-                           (doi not in seen_dois or doi == 'n/a'):
-                            seen_titles.add(title)
-                            if doi != 'n/a':
+                        title = result.get('Title', '').lower().strip()
+
+                        is_duplicate = False
+                        if doi and doi != 'n/a':
+                            if doi in seen_dois:
+                                is_duplicate = True
+                            else:
                                 seen_dois.add(doi)
+                        else: # No DOI available
+                            if title in seen_titles_without_doi:
+                                is_duplicate = True
+                            else:
+                                seen_titles_without_doi.add(title)
+                        
+                        if not is_duplicate:
                             all_results.append(result)
                     # --- TRACK SUCCESS ---
                     self.last_successful_searchers.append(searcher.name)

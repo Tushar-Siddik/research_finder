@@ -70,37 +70,48 @@ def _to_title_case(text: str) -> str:
 def _parse_venue_info(venue_str: str) -> dict:
     """
     Tries to parse a complex venue string into journal, volume, issue, and pages.
-    
-    NOTE: This is a best-effort parser using a regular expression to handle common formats.
-    It may not successfully parse every possible venue string format from all APIs.
-    Example input: "Psycho-Oncology, 13(6), 408-428"
+    This version is more flexible and handles various formats.
+    Example inputs:
+    - "Psycho-Oncology, 13(6), 408-428"
+    - "Nature, 589, 590-594"
+    - "Journal of Clinical Oncology: 10(23): 1234-1245"
     """
     if not venue_str or venue_str == 'N/A':
         return {'journal': 'N/A', 'volume': 'N/A', 'issue': 'N/A', 'pages': 'N/A'}
 
-    # Regex to capture journal, volume, issue, and pages
-    # This is a best-effort attempt and may not work for all formats
-    match = re.match(r'^(.*?),\s*([0-9]+)\(([^)]+)\),?\s*(.*)$', venue_str)
-    if match:
-        return {
-            'journal': _to_title_case(match.group(1)),
-            'volume': match.group(2),
-            'issue': match.group(3),
-            'pages': match.group(4) or 'N/A'
-        }
+    # Normalize the string
+    venue_str = venue_str.strip()
     
-    # Fallback if regex fails (e.g., no issue or pages)
-    match_simple = re.match(r'^(.*?),\s*([0-9]+)', venue_str)
-    if match_simple:
-        return {
-            'journal': _to_title_case(match_simple.group(1)),
-            'volume': match_simple.group(2),
-            'issue': 'N/A',
-            'pages': 'N/A'
-        }
+    # Initialize default values
+    journal, volume, issue, pages = 'N/A', 'N/A', 'N/A', 'N/A'
+    
+    # Extract pages (e.g., "408-428", "123-45", "e123")
+    pages_match = re.search(r'([e]?\d+-\d+)', venue_str)
+    if pages_match:
+        pages = pages_match.group(1)
+        venue_str = venue_str.replace(pages_match.group(0), '', 1).strip()
 
-    # Final fallback: treat the whole string as the journal name
-    return {'journal': _to_title_case(venue_str), 'volume': 'N/A', 'issue': 'N/A', 'pages': 'N/A'}
+    # Extract issue (e.g., "(6)", ":23")
+    issue_match = re.search(r'[\(,:]\s*(\d+)[\)\:]?', venue_str)
+    if issue_match:
+        issue = issue_match.group(1)
+        venue_str = venue_str.replace(issue_match.group(0), '', 1).strip()
+
+    # Extract volume (e.g., "13", "589")
+    volume_match = re.search(r'\b(\d+)\b', venue_str)
+    if volume_match:
+        volume = volume_match.group(1)
+        venue_str = venue_str.replace(volume_match.group(0), '', 1).strip()
+
+    # Whatever is left is likely the journal name
+    journal = _to_title_case(venue_str.strip(' ,:'))
+
+    return {
+        'journal': journal if journal else 'N/A',
+        'volume': volume,
+        'issue': issue,
+        'pages': pages
+    }
 
 def format_apa7(paper: dict) -> str:
     """

@@ -45,7 +45,14 @@ class ArxivSearcher(BaseSearcher):
 
             for entry in feed.entries:
                 authors_list = [author.name for author in entry.authors]
+                # Safely extract arxiv_id and construct DOI
+                doi = 'N/A'
                 arxiv_id = entry.id.split('/')[-1] if entry.id else None
+                if arxiv_id and arxiv_id.replace('v', '').replace('.', '').isdigit():
+                    # Standard arXiv DOI prefix
+                    constructed_doi = f"10.48550/arXiv.{arxiv_id}"
+                    if validate_doi(constructed_doi) != 'N/A':
+                        doi = constructed_doi
 
                 paper = {
                     'Title': normalize_string(entry.title),
@@ -54,7 +61,7 @@ class ArxivSearcher(BaseSearcher):
                     'URL': entry.link,
                     'Source': self.name,
                     'Citation Count': 'N/A',
-                    'DOI': validate_doi(f"10.48550/arXiv.{arxiv_id}"),
+                    'DOI': doi,
                     'Venue': 'arXiv',
                     'License Type': normalize_string(entry.get('rights', 'N/A'))
                 }
