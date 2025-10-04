@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from config import LOG_LEVEL, LOG_FORMAT
+# --- IMPORT THE VALIDATOR ---
+from research_finder.validator import validate_config
 
 # We will handle the optional Google Scholar import here
 try:
@@ -162,6 +164,20 @@ def main():
     """Main function to run the research finder tool."""
     setup_logging()
     logger = logging.getLogger("Main")
+
+    # --- NEW: VALIDATE CONFIGURATION AT STARTUP ---
+    errors, warnings = validate_config()
+    if errors:
+        print("\nConfiguration validation failed with critical errors. Please address them and restart.")
+        sys.exit(1) # Exit with a non-zero status code to indicate an error
+    
+    if warnings:
+        print("\nConfiguration validation completed with warnings. The tool will run with limited functionality.")
+        print("See the logs above for details. Press Enter to continue.")
+        input() # Pause for user to acknowledge warnings
+    else:
+        print("\nConfiguration validation successful. All settings are OK.")
+    # --- END OF NEW SECTION ---
 
     # 1. Get user input for the search
     query, output_file, limit, clear_cache, _, export_format = get_user_input()
