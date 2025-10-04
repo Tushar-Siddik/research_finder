@@ -45,11 +45,36 @@ def get_user_input():
         print("Search query cannot be empty. Exiting.")
         exit()
 
-    output_file = input("Enter output CSV filename (e.g., results.csv): ").strip()
+    output_file = input("Enter output filename (without extension): ").strip()
     if not output_file:
-        output_file = f"{query} search_results.csv"
-    if not output_file.endswith('.csv'):
-        output_file += '.csv'
+        output_file = f"{query}_search_results"
+    
+    # Get export format
+    print("\n--- Select Export Format ---")
+    print("1. CSV")
+    print("2. JSON")
+    print("3. BibTeX")
+    print("4. RIS")
+    print("5. Excel")
+    
+    format_map = {
+        "1": "csv",
+        "2": "json",
+        "3": "bibtex",
+        "4": "ris",
+        "5": "excel"
+    }
+    
+    while True:
+        format_choice = input("Select export format (1-5, default=1): ").strip()
+        if not format_choice:
+            format_choice = "1"
+            
+        if format_choice in format_map:
+            export_format = format_map[format_choice]
+            break
+        else:
+            print("Invalid option. Please enter 1, 2, 3, 4, or 5.")
 
     while True:
         try:
@@ -82,7 +107,7 @@ def get_user_input():
     clear_cache = (cache_option == "3")
     clear_expired = (cache_option == "2")
             
-    return query, output_file, limit, clear_cache, clear_expired
+    return query, output_file, limit, clear_cache, clear_expired, export_format
 
 def get_searcher_selection():
     """
@@ -139,7 +164,7 @@ def main():
     logger = logging.getLogger("Main")
 
     # 1. Get user input for the search
-    query, output_file, limit, clear_cache, _ = get_user_input()
+    query, output_file, limit, clear_cache, _, export_format = get_user_input()
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
@@ -171,7 +196,7 @@ def main():
 
     # 7. Export Results
     if all_articles:
-        exporter.to_csv(all_articles, output_file)
+        exporter.export(all_articles, output_file, export_format)
     else:
         logger.info("No articles found to export.")
 

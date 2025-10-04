@@ -5,3 +5,4 @@ scholarly
 python-dotenv
 pyalex
 tqdm
+openpyxl
