@@ -20,19 +20,30 @@ class GoogleScholarSearcher(BaseSearcher):
         self.rate_limit = GOOGLE_SCHOLAR_RATE_LIMIT
         self.logger.warning("Google Scholar has no official API. Rate limiting is critical to avoid being blocked.")
     
-    def search(self, query: str, limit: int = 5) -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit}. (Caution: Unreliable)")
+    def search(self, query: str, limit: int = 5, search_type: str = 'keyword') -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}. (Caution: Unreliable)")
         
-        cached_results = self._get_from_cache(query, limit)
+        cached_results = self._get_from_cache(query, limit, search_type)
         if cached_results:
             self.results = cached_results
             return
             
         self.clear_results()
         try:
-            self.logger.debug(f"Starting scholarly search for query: '{query}'")
-            search_query = scholarly.search_pubs(query)
-            for i, pub in enumerate(search_query):
+            # Construct query based on search_type
+            search_query = query
+            if search_type == 'title':
+                search_query = f'"{query}"' # Exact phrase match
+            elif search_type == 'author':
+                # For author search, we can try to find publications by a specific author
+                # scholarly.search_author is more robust but returns author profiles, not publications directly.
+                # We'll stick to a keyword search for consistency.
+                search_query = f"author:{query}"
+
+            self.logger.debug(f"Starting scholarly search for query: '{search_query}'")
+            search_query_gen = scholarly.search_pubs(search_query)
+            
+            for i, pub in enumerate(search_query_gen):
                 if i >= limit:
                     self.logger.debug(f"Reached limit of {limit} results. Stopping search.")
                     break
@@ -58,7 +69,7 @@ class GoogleScholarSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper {i+1}: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit)
+            self._save_to_cache(query, limit, search_type)
             self.logger.info(f"Found and stored {len(self.results)} papers from Google Scholar.")
             
         except Exception as e:

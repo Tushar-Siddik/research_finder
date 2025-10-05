@@ -53,13 +53,30 @@ def setup_logging():
 def get_user_input():
     """Gets search parameters from the user via command-line prompts."""
     print("\n--- Research Article Finder ---")
-    query = input("Enter keywords to search for: ").strip()
-    if not query:
-        print("Search query cannot be empty. Exiting.")
-        exit()
+    
+    # Ask for search type first
+    print("What would you like to search by?")
+    print("1. Keywords (in title, abstract, etc.)")
+    print("2. Title")
+    print("3. Author")
+    
+    search_type_map = {"1": "keyword", "2": "title", "3": "author"}
+    while True:
+        type_choice = input("Select search type (1-3, default=1): ").strip()
+        if not type_choice:
+            type_choice = "1"
+        if type_choice in search_type_map:
+            search_type = search_type_map[type_choice]
+            break
+        else:
+            print("Invalid option. Please enter 1, 2, or 3.")
 
-    # --- REMOVED: Export format and filename questions ---
-    # These will be asked later, after the search is complete.
+    # Prompt text changes based on search type
+    prompt_text = f"Enter {search_type} to search for: "
+    query = input(prompt_text).strip()
+    if not query:
+        print(f"Search {search_type} cannot be empty. Exiting.")
+        exit()
     
     while True:
         try:
@@ -94,7 +111,7 @@ def get_user_input():
             
     # --- MODIFIED RETURN VALUE ---
     # No longer returns output_file or export_format
-    return query, limit, clear_cache, clear_expired
+    return query, limit, clear_cache, clear_expired, search_type
 
 def get_searcher_selection():
     """
@@ -164,10 +181,10 @@ def main():
         print("\nConfiguration validation successful. All settings are OK.")
 
     # 1. Get user input for the search (now only search-related)
-    query, limit, clear_cache, _ = get_user_input()
+    query, limit, clear_cache, _, search_type = get_user_input()
     
-    # --- NEW: Log user configuration for debugging ---
-    logger.debug(f"User input received - Query: '{query}', Limit: {limit}")
+    # Log user configuration for debugging
+    logger.debug(f"User input received - Type: {search_type}, Query: '{query}', Limit: {limit}")
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
@@ -196,7 +213,7 @@ def main():
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
     # 6. Run Searches and Get Results
-    all_articles = list(aggregator.run_all_searches(query, limit, stream=True))
+    all_articles = list(aggregator.run_all_searches(query, limit, search_type, stream=True))
 
     # 7. Display the Error Recovery Summary
     print("\n--- Search Summary ---")

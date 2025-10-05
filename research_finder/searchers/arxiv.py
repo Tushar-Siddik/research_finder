@@ -18,17 +18,25 @@ class ArxivSearcher(BaseSearcher):
         self.logger.info(f"arXiv searcher initialized with rate limit: {self.rate_limit} req/s")
 
     
-    def search(self, query: str, limit: int = 10) -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
         
-        cached_results = self._get_from_cache(query, limit)
+        cached_results = self._get_from_cache(query, limit, search_type)
         if cached_results:
             self.results = cached_results
             return
             
         self.clear_results()
+        
+        if search_type == 'title':
+            search_query = f'ti:"{query}"'
+        elif search_type == 'author':
+            search_query = f'au:"{query}"'
+        else: # Default to keyword
+            search_query = f'all:"{query}"'
+        
         params = {
-            'search_query': f'all:"{query}"',
+            'search_query': search_query,
             'start': 0,
             'max_results': limit
         }
@@ -69,7 +77,7 @@ class ArxivSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit)
+            self._save_to_cache(query, limit, search_type)
             self.logger.info(f"Found and stored {len(self.results)} papers from arXiv.")
             
         except requests.exceptions.Timeout:

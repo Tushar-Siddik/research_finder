@@ -1,3 +1,5 @@
+# research_finder/searchers/openalex.py
+
 """
 OpenAlex Searcher Module
 """
@@ -40,10 +42,10 @@ class OpenAlexSearcher(BaseSearcher):
         else:
             self.rate_limit = OPENALEX_RATE_LIMIT_NO_EMAIL
     
-    def search(self, query: str, limit: int = 10) -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
         
-        cached_results = self._get_from_cache(query, limit)
+        cached_results = self._get_from_cache(query, limit, search_type)
         if cached_results:
             self.results = cached_results
             return
@@ -58,13 +60,17 @@ class OpenAlexSearcher(BaseSearcher):
                 "authorships,cited_by_count,open_access,doi,type,best_oa_location"
             )
             
-            self.logger.debug(f"Executing pyalex Works().search('{query}').select('{fields_to_select}').get(per_page={limit})")
-            results = (
-                Works()
-                .search(query)
-                .select(fields_to_select)
-                .get(per_page=limit)
-            )
+            # Construct query based on search_type
+            works_query = Works().select(fields_to_select)
+            if search_type == 'title':
+                works_query = works_query.filter(title={"search": query})
+            elif search_type == 'author':
+                works_query = works_query.filter(author={"display_name": query})
+            else: # Default to keyword
+                works_query = works_query.search(query)
+
+            self.logger.debug(f"Executing pyalex query: {works_query}")
+            results = works_query.get(per_page=limit)
             
             if not results:
                 self.logger.info("No articles found in OpenAlex.")
@@ -99,7 +105,7 @@ class OpenAlexSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit)
+            self._save_to_cache(query, limit, search_type)
             self.logger.info(f"Found and stored {len(self.results)} papers from OpenAlex.")
             
         except Exception as e:

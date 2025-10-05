@@ -20,18 +20,27 @@ class SemanticScholarSearcher(BaseSearcher):
         else:
             self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
 
-    def search(self, query: str, limit: int = 10) -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
         
-        cached_results = self._get_from_cache(query, limit)
+        cached_results = self._get_from_cache(query, limit, search_type)
         if cached_results:
             self.results = cached_results
             return
             
         self.clear_results()
         
+        # Construct query based on search_type
+        # S2 API doesn't have specific fields for title/author in this endpoint,
+        # so we construct the query string for a best-effort search.
+        api_query = query
+        if search_type == 'title':
+            api_query = f'"{query}"' # Exact phrase match for title
+        elif search_type == 'author':
+            api_query = f'author:"{query}"' # Search within author field
+        
         params = {
-            'query': query,
+            'query': api_query,
             'limit': limit,
             'fields': 'title,authors,year,abstract,url,citationCount,venue,openAccessPdf,externalIds'
         }
@@ -89,7 +98,7 @@ class SemanticScholarSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit)
+            self._save_to_cache(query, limit, search_type)
             self.logger.info(f"Found and stored {len(self.results)} papers from Semantic Scholar.")
             
         except requests.exceptions.Timeout:

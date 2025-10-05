@@ -27,7 +27,7 @@ class PubmedSearcher(BaseSearcher):
         
         nih_url = f"https://icite.od.nih.gov/api/pubs?pmids={pmid}"
         try:
-            time.sleep(0.2)  # 200ms delay
+            time.sleep(0.2)
             self.logger.debug(f"Fetching citation count for PMID {pmid} from NIH iCite API.")
             nih_response = requests.get(nih_url, timeout=REQUEST_TIMEOUT)
             nih_response.raise_for_status()
@@ -43,10 +43,10 @@ class PubmedSearcher(BaseSearcher):
         
         return 0
     
-    def search(self, query: str, limit: int = 10) -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
         
-        cached_results = self._get_from_cache(query, limit)
+        cached_results = self._get_from_cache(query, limit, search_type)
         if cached_results:
             self.results = cached_results
             return
@@ -54,11 +54,19 @@ class PubmedSearcher(BaseSearcher):
         self.clear_results()
         
         try:
+            # Construct query based on search_type
+            if search_type == 'title':
+                search_term = f"{query}[Title]"
+            elif search_type == 'author':
+                search_term = f"{query}[Author]"
+            else: # Default to keyword
+                search_term = query
+
             # Step 1: Use esearch to get a list of PMIDs
             self._enforce_rate_limit()
             search_params = {
                 'db': 'pubmed',
-                'term': query,
+                'term': search_term,
                 'retmode': 'json',
                 'retmax': limit
             }
@@ -154,7 +162,7 @@ class PubmedSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit)
+            self._save_to_cache(query, limit, search_type)
             self.logger.info(f"Found and stored {len(self.results)} papers from PubMed.")
             
         except requests.exceptions.RequestException as e:

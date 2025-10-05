@@ -21,21 +21,28 @@ class CrossrefSearcher(BaseSearcher):
         else:
             self.rate_limit = CROSSREF_RATE_LIMIT_NO_KEY
 
-    def search(self, query: str, limit: int = 10) -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
         
-        cached_results = self._get_from_cache(query, limit)
+        cached_results = self._get_from_cache(query, limit, search_type)
         if cached_results:
             self.results = cached_results
             return
             
         self.clear_results()
         
+        # Construct query based on search_type
         params = {
-            'query': query,
             'rows': limit,
             'select': 'title,author,container-title,DOI,created,license,URL,is-referenced-by-count'
         }
+        
+        if search_type == 'title':
+            params['query.title'] = query
+        elif search_type == 'author':
+            params['query.author'] = query
+        else: # Default to keyword
+            params['query'] = query
         
         if self.mailto:
             params['mailto'] = self.mailto
@@ -95,7 +102,7 @@ class CrossrefSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit)
+            self._save_to_cache(query, limit, search_type)
             self.logger.info(f"Found and stored {len(self.results)} papers from CrossRef.")
             
         except requests.exceptions.RequestException as e:

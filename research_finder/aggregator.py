@@ -29,7 +29,7 @@ class Aggregator:
         else:
             self.logger.error(f"Failed to add searcher: {searcher} is not a valid BaseSearcher instance.")
     
-    def _process_searchers(self, query: str, limit: int) -> Iterator[dict]:
+    def _process_searchers(self, query: str, limit: int, search_type: str) -> Iterator[dict]:
         """
         Internal helper to iterate through searchers, find articles, and yield results.
         This method contains the core logic for searching and deduplication.
@@ -47,7 +47,8 @@ class Aggregator:
             pbar.set_postfix_str(f"Current: {searcher.name}")
             
             try:
-                searcher.search(query, limit)
+                # Pass search_type to the search method
+                searcher.search(query, limit, search_type)
                 raw_results = searcher.get_results()
                 self.logger.debug(f"{searcher.name} returned {len(raw_results)} raw results.")
                 
@@ -87,18 +88,18 @@ class Aggregator:
         pbar.close()
         self.logger.info(f"Aggregation complete. Total unique articles yielded: {total_yielded}")
 
-    def run_all_searches(self, query: str, limit: int, stream: bool = False) -> Union[List[dict], Iterator[dict]]:
+    def run_all_searches(self, query: str, limit: int, search_type: str = 'keyword', stream: bool = False) -> Union[List[dict], Iterator[dict]]:
         """
         Runs the search query on all added searchers.
         """
-        self.logger.info(f"--- Starting search for '{query}' across {len(self.searchers)} vendors ---")
+        self.logger.info(f"--- Starting search for '{query}' (type: {search_type}) across {len(self.searchers)} vendors ---")
 
         if stream:
             # For streaming, we just return the generator directly
-            return self._process_searchers(query, limit)
+            return self._process_searchers(query, limit, search_type)
         else:
             # For non-streaming, we consume the generator into a list
-            all_results = list(self._process_searchers(query, limit))
+            all_results = list(self._process_searchers(query, limit, search_type))
             self.logger.info(f"--- Search complete. Total unique results found: {len(all_results)} ---")
             return all_results
 

@@ -12,14 +12,19 @@ class BaseSearcher(ABC):
         self.cache_manager = cache_manager
         self.logger = logging.getLogger(self.name)
         
-        # Instance variable to track the last request time for this specific searcher instance.
         self._last_request_time = 0
-        # A default rate limit. Subclasses MUST override this in their __init__ method.
         self.rate_limit = 1.0
 
     @abstractmethod
-    def search(self, query: str, limit: int) -> None:
-        """Performs a search and populates the self.results list."""
+    def search(self, query: str, limit: int, search_type: str = 'keyword') -> None:
+        """
+        Performs a search and populates the self.results list.
+        
+        Args:
+            query: The search term.
+            limit: Maximum number of results to return.
+            search_type: The type of search ('keyword', 'title', 'author').
+        """
         pass
 
     def get_results(self) -> List[Dict[str, Any]]:
@@ -30,16 +35,16 @@ class BaseSearcher(ABC):
         """Clears the stored results."""
         self.results = []
         
-    def _get_from_cache(self, query: str, limit: int) -> Optional[List[Dict[str, Any]]]:
+    def _get_from_cache(self, query: str, limit: int, search_type: str = 'keyword') -> Optional[List[Dict[str, Any]]]:
         """Try to get results from cache."""
         if self.cache_manager:
-            return self.cache_manager.get(query, self.name, limit)
+            return self.cache_manager.get(query, self.name, limit, search_type)
         return None
         
-    def _save_to_cache(self, query: str, limit: int) -> None:
+    def _save_to_cache(self, query: str, limit: int, search_type: str = 'keyword') -> None:
         """Save results to cache."""
         if self.cache_manager and self.results:
-            self.cache_manager.set(query, self.name, limit, self.results)
+            self.cache_manager.set(query, self.name, limit, self.results, search_type)
 
     def _check_api_key(self, key_name: str, key_value: str) -> bool:
         """Checks if an API key is available, logs a message, and returns a boolean."""
@@ -62,5 +67,4 @@ class BaseSearcher(ABC):
             self.logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
             time.sleep(sleep_time)
         
-        # Update the last request time to now
         self._last_request_time = time.time()
