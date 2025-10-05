@@ -3,7 +3,13 @@ import csv
 import json
 import logging
 from typing import List, Dict, Any, Union, Iterator
+from pathlib import Path
 from .utils import format_apa7
+
+import sys
+from pathlib import Path as SysPath
+sys.path.append(str(SysPath(__file__).parent.parent.parent))
+from config import DEFAULT_OUTPUT_DIR
 
 class Exporter:
     """Handles exporting data to various formats."""
@@ -11,6 +17,78 @@ class Exporter:
     def __init__(self):
         self.logger = logging.getLogger("Exporter")
 
+    def export(self, data: Union[List[Dict[str, Any]], Iterator], filename: str, format: str = 'csv') -> None:
+        """
+        Export data to the specified format.
+        
+        Args:
+            data: The data to export
+            filename: The output filename (without extension)
+            format: The export format ('csv', 'json', 'bibtex', 'ris', 'excel')
+        """
+        format = format.lower()
+        
+        # Map format names to correct file extensions ---
+        # This is necessary because pandas infers the engine from the file extension.
+        # "excel" is not a valid extension, but "xlsx" is.
+        extension_map = {
+            'excel': 'xlsx',
+            'bibtex': 'bib'
+        }
+        file_extension = extension_map.get(format, format)
+        
+        try:
+            # Create a Path object for the filename
+            file_path = Path(filename)
+            
+            # If the user provided a relative path, prepend the default output directory
+            if not file_path.is_absolute():
+                full_path = Path(DEFAULT_OUTPUT_DIR) / file_path
+            else:
+                full_path = file_path
+            
+            # Ensure the filename has the correct extension
+            if not full_path.name.endswith(f'.{file_extension}'):
+                full_path = full_path.with_suffix(f'.{file_extension}')
+            
+            # Convert the full path back to a string for the export methods
+            output_filename = str(full_path)
+            
+            self.logger.info(f"Starting export to {format.upper()} format: {output_filename}")
+            # self.logger.info(f"Exporting to full path: {output_filename}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to construct output path: {e}. Falling back to current directory.")
+            output_filename = f"{filename}.{file_extension}" # Fallback to old behavior
+        
+        # Convert iterator to list to count records
+        if isinstance(data, Iterator):
+            data_list = list(data)
+        else:
+            data_list = data
+
+        if not data_list:
+            self.logger.warning("No data provided to export.")
+            return
+            
+        self.logger.debug(f"Preparing to export {len(data_list)} records.")
+        
+        if format == 'csv':
+            self.to_csv(data_list, output_filename)
+        elif format == 'json':
+            self.to_json(data_list, output_filename)
+        elif format == 'bibtex':
+            self.to_bibtex(data_list, output_filename)
+        elif format == 'ris':
+            self.to_ris(data_list, output_filename)
+        elif format in ['excel', 'xlsx']:
+            self.to_excel(data_list, output_filename)
+        else:
+            self.logger.error(f"Unsupported export format: {format}")
+            return
+
+        self.logger.info(f"Successfully exported {len(data_list)} records to {output_filename}")
+    
     def to_csv(self, data: Union[List[Dict[str, Any]], Iterator], filename: str) -> None:
         """Exports a list or generator of dictionaries to a CSV file."""
         if not data:
@@ -217,42 +295,3 @@ class Exporter:
 
         except Exception as e:
             self.logger.error(f"Failed to export to Excel: {e}")
-
-    def export(self, data: Union[List[Dict[str, Any]], Iterator], filename: str, format: str = 'csv') -> None:
-        """
-        Export data to the specified format.
-        """
-        format = format.lower()
-        
-        if not filename.endswith(f'.{format}'):
-            filename = f"{filename}.{format}"
-        
-        self.logger.info(f"Starting export to {format.upper()} format: {filename}")
-        
-        # Convert iterator to list to count records
-        if isinstance(data, Iterator):
-            data_list = list(data)
-        else:
-            data_list = data
-
-        if not data_list:
-            self.logger.warning("No data provided to export.")
-            return
-            
-        self.logger.debug(f"Preparing to export {len(data_list)} records.")
-        
-        if format == 'csv':
-            self.to_csv(data_list, filename)
-        elif format == 'json':
-            self.to_json(data_list, filename)
-        elif format == 'bibtex':
-            self.to_bibtex(data_list, filename)
-        elif format == 'ris':
-            self.to_ris(data_list, filename)
-        elif format in ['excel', 'xlsx']:
-            self.to_excel(data_list, filename)
-        else:
-            self.logger.error(f"Unsupported export format: {format}")
-            return
-
-        self.logger.info(f"Successfully exported {len(data_list)} records to {filename}")
