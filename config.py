@@ -57,5 +57,7 @@ CACHE_EXPIRY_HOURS = 24  # Cache expires after 24 hours
 DEFAULT_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # Logging settings
-LOG_LEVEL = "INFO"
+LOG_LEVEL = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# Set to a filename to enable logging to a file, e.g., "research_finder.log"
+LOG_FILE = os.getenv("LOG_FILE", "") 

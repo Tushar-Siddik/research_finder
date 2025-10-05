@@ -14,7 +14,6 @@ class ArxivSearcher(BaseSearcher):
 
     def __init__(self, cache_manager=None):
         super().__init__("arXiv", cache_manager)
-        # arXiv doesn't use an API key, so we just set the rate limit
         self.rate_limit = ARXIV_RATE_LIMIT
         self.logger.info(f"arXiv searcher initialized with rate limit: {self.rate_limit} req/s")
 
@@ -22,7 +21,6 @@ class ArxivSearcher(BaseSearcher):
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         
-        # Try to get from cache first
         cached_results = self._get_from_cache(query, limit)
         if cached_results:
             self.results = cached_results
@@ -35,21 +33,24 @@ class ArxivSearcher(BaseSearcher):
             'max_results': limit
         }
         
-        # Enforce rate limit BEFORE the request
         self._enforce_rate_limit()
         
         try:
+            self.logger.debug(f"Making GET request to {self.BASE_URL} with params: {params}")
             response = requests.get(self.BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
+            self.logger.debug(f"Received response with status code: {response.status_code}")
             response.raise_for_status()
+            
             feed = feedparser.parse(response.content)
+            entries = feed.entries
+            self.logger.debug(f"Successfully parsed feed. Found {len(entries)} entries.")
 
-            for entry in feed.entries:
+            for entry in entries:
                 authors_list = [author.name for author in entry.authors]
-                # Safely extract arxiv_id and construct DOI
+                
                 doi = 'N/A'
                 arxiv_id = entry.id.split('/')[-1] if entry.id else None
                 if arxiv_id and arxiv_id.replace('v', '').replace('.', '').isdigit():
-                    # Standard arXiv DOI prefix
                     constructed_doi = f"10.48550/arXiv.{arxiv_id}"
                     if validate_doi(constructed_doi) != 'N/A':
                         doi = constructed_doi
@@ -65,16 +66,17 @@ class ArxivSearcher(BaseSearcher):
                     'Venue': 'arXiv',
                     'License Type': normalize_string(entry.get('rights', 'N/A'))
                 }
+                self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            # Save to cache
             self._save_to_cache(query, limit)
-            self.logger.info(f"Found {len(self.results)} papers.")
+            self.logger.info(f"Found and stored {len(self.results)} papers from arXiv.")
+            
         except requests.exceptions.Timeout:
-            self.logger.error("Request to arXiv API timed out")
+            self.logger.error("Request to arXiv API timed out.", exc_info=True)
         except requests.exceptions.HTTPError as e:
-            self.logger.error(f"HTTP error occurred: {e}")
+            self.logger.error(f"HTTP error occurred: {e}", exc_info=True)
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed: {e}")
+            self.logger.error(f"API request failed: {e}", exc_info=True)
         except Exception as e:
-            self.logger.error(f"Failed to parse arXiv response: {e}")
+            self.logger.error(f"Failed to parse arXiv response: {e}", exc_info=True)

@@ -16,18 +16,14 @@ class CrossrefSearcher(BaseSearcher):
         super().__init__("CrossRef", cache_manager)
         self.mailto = CROSSREF_MAILTO
 
-        # CrossRef uses a 'mailto' for its polite pool.
         if self._check_api_key("CrossRef 'mailto' email", self.mailto):
-            # The polite pool has a higher limit.
-            self.rate_limit = CROSSREF_RATE_LIMIT_WITH_KEY  # 1: 1 request per second
+            self.rate_limit = CROSSREF_RATE_LIMIT_WITH_KEY
         else:
-            # We should be extra polite if not identifying ourselves.
-            self.rate_limit = CROSSREF_RATE_LIMIT_NO_KEY  # 1 request every 2 seconds
+            self.rate_limit = CROSSREF_RATE_LIMIT_NO_KEY
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         
-        # Try to get from cache first
         cached_results = self._get_from_cache(query, limit)
         if cached_results:
             self.results = cached_results
@@ -35,35 +31,32 @@ class CrossrefSearcher(BaseSearcher):
             
         self.clear_results()
         
-        # CrossRef uses a 'query' parameter for the search query
-        # We use 'select' to specify which fields we want
         params = {
             'query': query,
             'rows': limit,
-            'select': 'title,author,container-title,DOI,created,license,URL,is-referenced-by-count' # Select fields to return
+            'select': 'title,author,container-title,DOI,created,license,URL,is-referenced-by-count'
         }
         
-        # Add mailto for politeness and better rate limits
         if self.mailto:
             params['mailto'] = self.mailto
+            self.logger.debug("Using 'mailto' for polite pool access.")
+        else:
+            self.logger.debug("No 'mailto' provided. Request will be unpolite.")
 
         try:
             self._enforce_rate_limit()
             
-            response = requests.get(
-                self.BASE_URL, 
-                params=params, 
-                timeout=REQUEST_TIMEOUT
-            )
+            self.logger.debug(f"Making GET request to {self.BASE_URL} with params: {params}")
+            response = requests.get(self.BASE_URL, params=params, timeout=REQUEST_TIMEOUT)
+            self.logger.debug(f"Received response with status code: {response.status_code}")
             response.raise_for_status()
             data = response.json()
             
-            for item in data.get('message', {}).get('items', []):
-                # Title is often a list
+            items = data.get('message', {}).get('items', [])
+            self.logger.debug(f"Successfully parsed JSON. Found {len(items)} items in 'message.items' field.")
+            
+            for item in items:
                 title_list = item.get('title', ['N/A'])
-                # title = normalize_string(title_list[0] if title_list else 'N/A')
-                
-                # Authors can be complex, we'll format them simply
                 authors = []
                 for author in item.get('author', []):
                     given = author.get('given', '')
@@ -73,7 +66,6 @@ class CrossrefSearcher(BaseSearcher):
                     elif family:
                         authors.append(family)
                 
-                # Extract year from the 'created' date-time string
                 year = 'N/A'
                 created_date = item.get('created', {}).get('date-time', '')
                 if created_date:
@@ -82,11 +74,8 @@ class CrossrefSearcher(BaseSearcher):
                     except (ValueError, TypeError):
                         self.logger.warning(f"Could not parse date: {created_date}")
 
-                # Venue (container-title) is also a list
                 venue_list = item.get('container-title', ['N/A'])
-                # venue = venue_list[0] if venue_list else 'N/A'
                 
-                # License information can be a list of objects
                 license_info = 'N/A'
                 license_list = item.get('license', [])
                 if license_list and isinstance(license_list, list) and len(license_list) > 0:
@@ -103,11 +92,11 @@ class CrossrefSearcher(BaseSearcher):
                     'License Type': license_info,
                     'URL': item.get('URL')
                 }
+                self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            # Save to cache
             self._save_to_cache(query, limit)
-            self.logger.info(f"Found {len(self.results)} papers.")
+            self.logger.info(f"Found and stored {len(self.results)} papers from CrossRef.")
             
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed: {e}")
+            self.logger.error(f"API request failed: {e}", exc_info=True)

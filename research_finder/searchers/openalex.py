@@ -1,8 +1,5 @@
 """
 OpenAlex Searcher Module
-
-This module provides a searcher for the OpenAlex API using the pyalex package.
-OpenAlex is a free and open catalog of the global research system.
 """
 
 import logging
@@ -20,15 +17,13 @@ except ImportError:
     PYALEX_AVAILABLE = False
     Works = None
 
-# Try to import from config to overwrite defaults
 try:
     from config import OPENALEX_EMAIL, OPENALEX_RATE_LIMIT_WITH_EMAIL, OPENALEX_RATE_LIMIT_NO_EMAIL
 except Exception as e:
     logging.warning(f"Could not import OpenAlex config from config.py. Using default values. Error: {e}")
     OPENALEX_EMAIL = ""
-    # Define fallback defaults if config import fails
-    OPENALEX_RATE_LIMIT_WITH_EMAIL = 0.1  # 10 requests per second
-    OPENALEX_RATE_LIMIT_NO_EMAIL = 0.5   # 2 requests per second
+    OPENALEX_RATE_LIMIT_WITH_EMAIL = 0.1
+    OPENALEX_RATE_LIMIT_NO_EMAIL = 0.5
 
 class OpenAlexSearcher(BaseSearcher):
     """Searcher for the OpenAlex API using the pyalex package."""
@@ -39,19 +34,15 @@ class OpenAlexSearcher(BaseSearcher):
         
         super().__init__("OpenAlex", cache_manager)
         
-        # Use the check method for the email
         if self._check_api_key("OpenAlex 'polite pool' email", OPENALEX_EMAIL):
             pyalex.config.email = OPENALEX_EMAIL
-            # With an email, we can be more aggressive
-            self.rate_limit = OPENALEX_RATE_LIMIT_WITH_EMAIL  # 10 requests per second
+            self.rate_limit = OPENALEX_RATE_LIMIT_WITH_EMAIL
         else:
-            # Without an email, we should be more conservative
-            self.rate_limit = OPENALEX_RATE_LIMIT_NO_EMAIL  # 2 requests per second
+            self.rate_limit = OPENALEX_RATE_LIMIT_NO_EMAIL
     
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         
-        # Try to get from cache first
         cached_results = self._get_from_cache(query, limit)
         if cached_results:
             self.results = cached_results
@@ -60,16 +51,14 @@ class OpenAlexSearcher(BaseSearcher):
         self.clear_results()
         
         try:
-            # Use the inherited rate limiting method
             self._enforce_rate_limit()
             
-            # Define fields to select
             fields_to_select = (
                 "id,display_name,publication_year,primary_location,"
                 "authorships,cited_by_count,open_access,doi,type,best_oa_location"
             )
             
-            # Execute the search query
+            self.logger.debug(f"Executing pyalex Works().search('{query}').select('{fields_to_select}').get(per_page={limit})")
             results = (
                 Works()
                 .search(query)
@@ -81,6 +70,8 @@ class OpenAlexSearcher(BaseSearcher):
                 self.logger.info("No articles found in OpenAlex.")
                 return
 
+            self.logger.debug(f"Successfully retrieved {len(results)} results from OpenAlex.")
+
             for item in results:
                 authors_list = [
                     authorship.get('author', {}).get('display_name') 
@@ -88,7 +79,6 @@ class OpenAlexSearcher(BaseSearcher):
                 ]
                 
                 primary_location = item.get('primary_location') or {}
-                # venue = primary_location.get('source', {}).get('display_name', 'N/A')
                 
                 license_info = 'N/A'
                 oa_location = item.get('best_oa_location')
@@ -106,11 +96,11 @@ class OpenAlexSearcher(BaseSearcher):
                     'License Type': license_info,
                     'URL': item.get('id')
                 }
+                self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            # Save to cache
             self._save_to_cache(query, limit)
-            self.logger.info(f"Found {len(self.results)} papers.")
+            self.logger.info(f"Found and stored {len(self.results)} papers from OpenAlex.")
             
         except Exception as e:
-            self.logger.error(f"An error occurred with OpenAlex search: {e}")
+            self.logger.error(f"An error occurred with OpenAlex search: {e}", exc_info=True)

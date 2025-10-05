@@ -10,24 +10,19 @@ class SemanticScholarSearcher(BaseSearcher):
     """Searcher for the Semantic Scholar API."""
     
     BASE_URL = SEMANTIC_SCHOLAR_API_URL
-    # The class variable for _last_request_time is now removed and handled by the base class
 
     def __init__(self, cache_manager=None):
         super().__init__("Semantic Scholar", cache_manager)
         self.api_key = S2_API_KEY
         
-        # Use the new check method and adjust rate limit accordingly
         if self._check_api_key("Semantic Scholar API key", self.api_key):
-            # With an API key, you can make more requests per second
-            self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY  # 1: 1 request per second
+            self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY
         else:
-            # Without a key, the rate limit is much lower
-            self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY  # 1 request per 10 seconds
+            self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
 
     def search(self, query: str, limit: int = 10) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}")
         
-        # Try to get from cache first
         cached_results = self._get_from_cache(query, limit)
         if cached_results:
             self.results = cached_results
@@ -35,23 +30,23 @@ class SemanticScholarSearcher(BaseSearcher):
             
         self.clear_results()
         
-        # We use 'externalIds' to get the DOI.
         params = {
             'query': query,
             'limit': limit,
             'fields': 'title,authors,year,abstract,url,citationCount,venue,openAccessPdf,externalIds'
         }
         
-        # Set up headers with API key if available
         headers = {}
         if self.api_key:
             headers['x-api-key'] = self.api_key
+            self.logger.debug("Using API key for request.")
+        else:
+            self.logger.debug("No API key provided. Request will be unauthenticated.")
         
         try:
-            # Enforce rate limit before making the request
             self._enforce_rate_limit()
             
-            self.logger.debug(f"Making request to {self.BASE_URL} with params: {params}")
+            self.logger.debug(f"Making GET request to {self.BASE_URL} with params: {params}")
             
             response = requests.get(
                 self.BASE_URL, 
@@ -60,19 +55,21 @@ class SemanticScholarSearcher(BaseSearcher):
                 timeout=REQUEST_TIMEOUT
             )
             
+            self.logger.debug(f"Received response with status code: {response.status_code}")
             response.raise_for_status()
             data = response.json()
             
-            for item in data.get('data', []):
+            items = data.get('data', [])
+            self.logger.debug(f"Successfully parsed JSON. Found {len(items)} items in 'data' field.")
+            
+            for item in items:
                 authors_list = [author.get('name') for author in item.get('authors', [])]
                 
-                # Correctly and safely extract DOI from externalIds
                 doi = 'N/A'
                 external_ids = item.get('externalIds')
                 if isinstance(external_ids, dict):
                     doi = external_ids.get('DOI', 'N/A')
                 
-                # Extract license information
                 license_info = 'N/A'
                 open_access_pdf = item.get('openAccessPdf', {})
                 if open_access_pdf:
@@ -85,31 +82,31 @@ class SemanticScholarSearcher(BaseSearcher):
                     'URL': item.get('url'),
                     'Source': self.name,
                     'Citation Count': normalize_citation_count(item.get('citationCount', 0)),
-                    'DOI': validate_doi(doi),  # Now correctly extracted
+                    'DOI': validate_doi(doi),
                     'Venue': normalize_string(item.get('venue')),
                     'License Type': license_info
                 }
+                self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            # Save to cache
             self._save_to_cache(query, limit)
-            self.logger.info(f"Found {len(self.results)} papers.")
+            self.logger.info(f"Found and stored {len(self.results)} papers from Semantic Scholar.")
             
         except requests.exceptions.Timeout:
-            self.logger.error("Request to Semantic Scholar API timed out")
+            self.logger.error("Request to Semantic Scholar API timed out.", exc_info=True)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
-                self.logger.error("Authentication failed. Please check your Semantic Scholar API key.")
+                self.logger.error("Authentication failed. Please check your Semantic Scholar API key.", exc_info=True)
             elif e.response.status_code == 429:
                 retry_after = e.response.headers.get('Retry-After', 'unknown')
-                self.logger.error(f"Rate limit exceeded. Retry after {retry_after} seconds.")
+                self.logger.error(f"Rate limit exceeded. Retry after {retry_after} seconds.", exc_info=True)
             elif e.response.status_code == 400:
                 try:
                     error_content = e.response.json()
-                    self.logger.error(f"Bad Request: {error_content}")
+                    self.logger.error(f"Bad Request: {error_content}", exc_info=True)
                 except:
-                    self.logger.error(f"Bad Request: {e.response.text}")
+                    self.logger.error(f"Bad Request: {e.response.text}", exc_info=True)
             else:
-                self.logger.error(f"HTTP error occurred: {e}")
+                self.logger.error(f"HTTP error occurred: {e}", exc_info=True)
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed: {e}")
+            self.logger.error(f"API request failed: {e}", exc_info=True)

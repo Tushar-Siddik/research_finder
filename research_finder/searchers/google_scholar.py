@@ -17,14 +17,12 @@ class GoogleScholarSearcher(BaseSearcher):
         if not scholarly:
             raise ImportError("scholarly library not found. Install with 'pip install scholarly'")
         super().__init__("Google Scholar", cache_manager)
-        # Google Scholar has no official API. We enforce a conservative rate limit.
         self.rate_limit = GOOGLE_SCHOLAR_RATE_LIMIT
         self.logger.warning("Google Scholar has no official API. Rate limiting is critical to avoid being blocked.")
     
     def search(self, query: str, limit: int = 5) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit}. (Caution: Unreliable)")
         
-        # Try to get from cache first
         cached_results = self._get_from_cache(query, limit)
         if cached_results:
             self.results = cached_results
@@ -32,12 +30,13 @@ class GoogleScholarSearcher(BaseSearcher):
             
         self.clear_results()
         try:
+            self.logger.debug(f"Starting scholarly search for query: '{query}'")
             search_query = scholarly.search_pubs(query)
             for i, pub in enumerate(search_query):
                 if i >= limit:
+                    self.logger.debug(f"Reached limit of {limit} results. Stopping search.")
                     break
                 
-                # Use the inherited rate limiting method before each result
                 self._enforce_rate_limit()
 
                 doi = None
@@ -56,11 +55,11 @@ class GoogleScholarSearcher(BaseSearcher):
                     'Venue': normalize_string(pub.get('bib', {}).get('journal', '')),
                     'License Type': 'N/A'
                 }
+                self.logger.debug(f"Parsing paper {i+1}: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            # Save to cache
             self._save_to_cache(query, limit)
-            self.logger.info(f"Found {len(self.results)} papers.")
+            self.logger.info(f"Found and stored {len(self.results)} papers from Google Scholar.")
             
         except Exception as e:
-            self.logger.error(f"Search failed: {e}. This is common with Google Scholar.")
+            self.logger.error(f"Search failed: {e}. This is common with Google Scholar.", exc_info=True)

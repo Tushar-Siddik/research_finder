@@ -9,7 +9,7 @@ from research_finder.searchers.crossref import CrossrefSearcher
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from config import LOG_LEVEL, LOG_FORMAT
+from config import LOG_LEVEL, LOG_FORMAT, LOG_FILE
 # --- IMPORT THE VALIDATOR ---
 from research_finder.validator import validate_config
 
@@ -33,10 +33,20 @@ except ImportError:
 
 def setup_logging():
     """Configure basic logging for the application."""
+    handlers = [logging.StreamHandler()]
+    
+    if LOG_FILE:
+        try:
+            file_handler = logging.FileHandler(LOG_FILE, mode='w', encoding='utf-8')
+            handlers.append(file_handler)
+            print(f"Logging to file: {LOG_FILE}")
+        except Exception as e:
+            print(f"Warning: Could not set up log file. Error: {e}")
+
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL),
         format=LOG_FORMAT,
-        handlers=[logging.StreamHandler()]
+        handlers=handlers
     )
 
 def get_user_input():
@@ -165,7 +175,7 @@ def main():
     setup_logging()
     logger = logging.getLogger("Main")
 
-    # --- NEW: VALIDATE CONFIGURATION AT STARTUP ---
+    # --- VALIDATE CONFIGURATION AT STARTUP ---
     errors, warnings = validate_config()
     if errors:
         print("\nConfiguration validation failed with critical errors. Please address them and restart.")
@@ -177,13 +187,17 @@ def main():
         input() # Pause for user to acknowledge warnings
     else:
         print("\nConfiguration validation successful. All settings are OK.")
-    # --- END OF NEW SECTION ---
 
     # 1. Get user input for the search
     query, output_file, limit, clear_cache, _, export_format = get_user_input()
+    
+    # --- NEW: Log user configuration for debugging ---
+    logger.debug(f"User input received - Query: '{query}', Limit: {limit}, Format: {export_format}, Output: {output_file}")
+    # --- END OF NEW SECTION ---
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
+    logger.debug(f"Selected searchers: {[cls.__name__ for cls in selected_searcher_classes]}")
 
     # 3. Initialize Components
     aggregator = Aggregator()

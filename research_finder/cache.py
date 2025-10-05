@@ -65,39 +65,29 @@ class CacheManager:
     def get(self, query: str, source: str, limit: int) -> Optional[List[Dict[str, Any]]]:
         """
         Retrieve cached results for a query.
-        
-        Args:
-            query: Search query
-            source: Source name
-            limit: Maximum number of results
-            
-        Returns:
-            Cached results if available and valid, None otherwise
         """
         cache_key = self._generate_cache_key(query, source, limit)
         cache_path = self._get_cache_path(cache_key)
         
+        self.logger.debug(f"Checking cache for key: {cache_key}")
+        
         if self._is_cache_valid(cache_path):
             try:
                 with open(cache_path, 'r', encoding='utf-8') as f:
-                    self.logger.info(f"Cache hit for {source} query: '{query}'")
+                    self.logger.info(f"Cache HIT for {source} query: '{query}'")
                     return json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 self.logger.error(f"Error reading cache file {cache_path}: {e}")
         
+        self.logger.info(f"Cache MISS for {source} query: '{query}'")
         return None
     
     def set(self, query: str, source: str, limit: int, results: List[Dict[str, Any]]) -> None:
         """
         Store search results in cache.
-        
-        Args:
-            query: Search query
-            source: Source name
-            limit: Maximum number of results
-            results: Search results to cache
         """
         if not results:
+            self.logger.debug(f"No results to cache for {source} query: '{query}'")
             return
             
         cache_key = self._generate_cache_key(query, source, limit)
@@ -106,7 +96,7 @@ class CacheManager:
         try:
             with open(cache_path, 'w', encoding='utf-8') as f:
                 json.dump(results, f, ensure_ascii=False)
-                self.logger.info(f"Cached {len(results)} results for {source} query: '{query}'")
+                self.logger.info(f"Cached {len(results)} results for {source} with key: {cache_key}")
         except IOError as e:
             self.logger.error(f"Error writing to cache file {cache_path}: {e}")
     

@@ -221,27 +221,38 @@ class Exporter:
     def export(self, data: Union[List[Dict[str, Any]], Iterator], filename: str, format: str = 'csv') -> None:
         """
         Export data to the specified format.
-        
-        Args:
-            data: The data to export
-            filename: The output filename (without extension)
-            format: The export format ('csv', 'json', 'bibtex', 'ris', 'excel')
         """
         format = format.lower()
         
-        # Add appropriate extension if not present
         if not filename.endswith(f'.{format}'):
             filename = f"{filename}.{format}"
         
+        self.logger.info(f"Starting export to {format.upper()} format: {filename}")
+        
+        # Convert iterator to list to count records
+        if isinstance(data, Iterator):
+            data_list = list(data)
+        else:
+            data_list = data
+
+        if not data_list:
+            self.logger.warning("No data provided to export.")
+            return
+            
+        self.logger.debug(f"Preparing to export {len(data_list)} records.")
+        
         if format == 'csv':
-            self.to_csv(data, filename)
+            self.to_csv(data_list, filename)
         elif format == 'json':
-            self.to_json(data, filename)
+            self.to_json(data_list, filename)
         elif format == 'bibtex':
-            self.to_bibtex(data, filename)
+            self.to_bibtex(data_list, filename)
         elif format == 'ris':
-            self.to_ris(data, filename)
+            self.to_ris(data_list, filename)
         elif format in ['excel', 'xlsx']:
-            self.to_excel(data, filename)
+            self.to_excel(data_list, filename)
         else:
             self.logger.error(f"Unsupported export format: {format}")
+            return
+
+        self.logger.info(f"Successfully exported {len(data_list)} records to {filename}")

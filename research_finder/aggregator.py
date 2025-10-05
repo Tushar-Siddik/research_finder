@@ -39,42 +39,53 @@ class Aggregator:
         
         seen_dois = set()
         seen_titles_without_doi = set()
+        total_yielded = 0
 
-        # Create a progress bar. 'desc' is the description, 'unit' is the unit of iteration.
         pbar = tqdm(self.searchers, desc="Searching Vendors", unit="source", file=sys.stdout)
         
         for searcher in pbar:
-            # Update the progress bar's description to show the current source
             pbar.set_postfix_str(f"Current: {searcher.name}")
             
             try:
                 searcher.search(query, limit)
-                for result in searcher.get_results():
+                raw_results = searcher.get_results()
+                self.logger.debug(f"{searcher.name} returned {len(raw_results)} raw results.")
+                
+                for result in raw_results:
                     doi = result.get('DOI', '').lower().strip()
                     title = result.get('Title', '').lower().strip()
 
                     is_duplicate = False
+                    duplicate_reason = ""
                     if doi and doi != 'n/a':
                         if doi in seen_dois:
                             is_duplicate = True
+                            duplicate_reason = "DOI"
                         else:
                             seen_dois.add(doi)
                     else: # No DOI available
                         if title in seen_titles_without_doi:
                             is_duplicate = True
+                            duplicate_reason = "Title"
                         else:
                             seen_titles_without_doi.add(title)
                     
                     if not is_duplicate:
+                        total_yielded += 1
+                        self.logger.debug(f"Yielding unique result: '{title[:50]}...'")
                         yield result
+                    else:
+                        self.logger.debug(f"Skipping duplicate result by {duplicate_reason}: '{title[:50]}...'")
                 
                 self.last_successful_searchers.append(searcher.name)
+                self.logger.info(f"Finished searching {searcher.name}. Found {len(raw_results)} results.")
 
             except Exception as e:
-                self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}")
+                self.logger.error(f"An error occurred with searcher '{searcher.name}': {e}", exc_info=True)
                 self.last_failed_searchers.append(searcher.name)
         
         pbar.close()
+        self.logger.info(f"Aggregation complete. Total unique articles yielded: {total_yielded}")
 
     def run_all_searches(self, query: str, limit: int, stream: bool = False) -> Union[List[dict], Iterator[dict]]:
         """
