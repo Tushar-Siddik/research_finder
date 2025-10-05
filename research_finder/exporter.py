@@ -10,6 +10,7 @@ import pandas as pd
 import csv
 import json
 import logging
+import types  # FIX: Import types for GeneratorType check
 from typing import List, Dict, Any, Union, Iterator
 from pathlib import Path
 from .utils import format_apa7
@@ -29,9 +30,11 @@ class Exporter:
     are saved to the correct output directory with the proper file extension.
     """
 
-    def __init__(self):
+    def __init__(self, output_dir: str = None):
         """Initializes the Exporter and sets up a logger."""
         self.logger = logging.getLogger("Exporter")
+        # FIX: Use the provided output_dir or fall back to the config default
+        self.default_output_dir = output_dir or DEFAULT_OUTPUT_DIR
 
     def export(self, data: Union[List[Dict[str, Any]], Iterator], filename: str, format: str = 'csv') -> None:
         """
@@ -48,36 +51,30 @@ class Exporter:
         format = format.lower()
         
         # Map user-friendly format names to correct file extensions.
-        # This is necessary because libraries like pandas infer the engine from the file extension.
-        # "excel" is not a valid extension, but "xlsx" is.
         extension_map = {
             'excel': 'xlsx',
             'bibtex': 'bib'
         }
         file_extension = extension_map.get(format, format)
         
-        try:
-            # Construct the full, absolute path for the output file.
-            file_path = Path(filename)
-            if not file_path.is_absolute():
-                full_path = Path(DEFAULT_OUTPUT_DIR) / file_path
-            else:
-                full_path = file_path
-            
-            # Ensure the filename has the correct extension.
-            if not full_path.name.endswith(f'.{file_extension}'):
-                full_path = full_path.with_suffix(f'.{file_extension}')
-            
-            output_filename = str(full_path)
-            self.logger.info(f"Starting export to {format.upper()} format: {output_filename}")
-
-        except Exception as e:
-            self.logger.error(f"Failed to construct output path: {e}. Falling back to current directory.")
-            # Fallback to the current directory if path construction fails.
-            output_filename = f"{filename}.{file_extension}"
+        # FIX: Removed the broad try...except to expose path errors in tests.
+        # Construct the full, absolute path for the output file.
+        file_path = Path(filename)
+        if not file_path.is_absolute():
+            full_path = Path(self.default_output_dir) / file_path
+        else:
+            full_path = file_path
+        
+        # Ensure the filename has the correct extension.
+        if not full_path.name.endswith(f'.{file_extension}'):
+            full_path = full_path.with_suffix(f'.{file_extension}')
+        
+        output_filename = str(full_path)
+        self.logger.info(f"Starting export to {format.upper()} format: {output_filename}")
         
         # Convert iterator to list to count records and for formats that need all data at once.
-        if isinstance(data, Iterator):
+        # FIX: Use a more specific check for generators.
+        if isinstance(data, types.GeneratorType):
             data_list = list(data)
         else:
             data_list = data
@@ -119,7 +116,7 @@ class Exporter:
 
         try:
             # Check if data is a generator/iterator for streaming.
-            if isinstance(data, Iterator):
+            if isinstance(data, types.GeneratorType):
                 self.logger.info(f"Streaming results to {filename}...")
                 with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
                     writer = csv.DictWriter(csvfile, fieldnames=final_columns)
@@ -160,7 +157,7 @@ class Exporter:
 
         try:
             # Convert iterator to list if needed.
-            if isinstance(data, Iterator):
+            if isinstance(data, types.GeneratorType):
                 data_list = list(data)
             else:
                 data_list = data
@@ -185,7 +182,7 @@ class Exporter:
 
         try:
             # Convert iterator to list if needed.
-            if isinstance(data, Iterator):
+            if isinstance(data, types.GeneratorType):
                 data_list = list(data)
             else:
                 data_list = data
@@ -193,9 +190,11 @@ class Exporter:
             with open(filename, 'w', encoding='utf-8') as bibtexfile:
                 for i, paper in enumerate(data_list):
                     # Generate a unique citation key for each entry.
-                    authors = paper.get('Authors', '').split(',')[0].replace(' ', '')
+                    authors_str = paper.get('Authors', '')
+                    first_author = authors_str.split(',')[0].strip()
+                    author_key = first_author.replace(' ', '').replace(',', '')
                     year = paper.get('Year', 'n.d.')
-                    citation_key = f"{authors}{year}" if authors != 'N/A' else f"paper{i}"
+                    citation_key = f"{author_key}{year}" if author_key else f"paper{i}"
                     
                     # Write the BibTeX entry.
                     bibtexfile.write(f"@article{{{citation_key},\n")
@@ -227,7 +226,7 @@ class Exporter:
 
         try:
             # Convert iterator to list if needed.
-            if isinstance(data, Iterator):
+            if isinstance(data, types.GeneratorType):
                 data_list = list(data)
             else:
                 data_list = data
@@ -242,10 +241,18 @@ class Exporter:
                     risfile.write(f"T1  - {title}\n")
                     
                     # Authors
-                    authors = paper.get('Authors', '').split(',')
+                    authors_raw = paper.get('Authors', '')
+                    authors_parts = [a.strip() for a in authors_raw.split(",")]
+                    # Group every two parts as one author
+                    authors = []
+                    for i in range(0, len(authors_parts), 2):
+                        if i+1 < len(authors_parts):
+                            authors.append(f"{authors_parts[i]}, {authors_parts[i+1]}")
+                        else:
+                            authors.append(authors_parts[i])  # just in case odd count
+
                     for author in authors:
-                        if author.strip():
-                            risfile.write(f"AU  - {author.strip()}\n")
+                        risfile.write(f"AU  - {author}\n")
                     
                     # Year
                     year = paper.get('Year', '')
@@ -288,7 +295,7 @@ class Exporter:
 
         try:
             # Convert iterator to list if needed.
-            if isinstance(data, Iterator):
+            if isinstance(data, types.GeneratorType):
                 data_list = list(data)
             else:
                 data_list = data
