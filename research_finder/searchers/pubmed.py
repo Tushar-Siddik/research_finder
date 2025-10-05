@@ -1,3 +1,11 @@
+"""
+Searcher for the PubMed API (Entrez).
+
+This module implements the PubmedSearcher class, which interacts with the NCBI Entrez APIs
+to find biomedical literature. It uses a two-step process (esearch followed by efetch)
+to retrieve article details and also fetches citation counts from the NIH iCite API.
+"""
+
 import time
 from typing import Dict, Any
 import requests
@@ -13,22 +21,39 @@ class PubmedSearcher(BaseSearcher):
     """Searcher for the PubMed API (Entrez) with an API key."""
 
     def __init__(self, cache_manager=None):
+        """
+        Initializes the PubmedSearcher.
+        
+        Args:
+            cache_manager: An optional CacheManager instance.
+        """
         super().__init__("PubMed", cache_manager)
         self.api_key = PUBMED_API_KEY
         
+        # Adjust the rate limit based on whether an API key is provided.
         if self._check_api_key("PubMed API key", self.api_key):
             self.rate_limit = PUBMED_RATE_LIMIT_WITH_KEY
         else:
             self.rate_limit = PUBMED_RATE_LIMIT_NO_KEY
 
     def _fetch_citation_count(self, pmid: str) -> int:
-        """Fetch citation count for a PubMed ID using NIH iCite API."""
+        """
+        Fetch citation count for a PubMed ID using the NIH iCite API.
+        
+        This is a separate API call, so we add a small delay to be polite.
+        
+        Args:
+            pmid: The PubMed ID of the article.
+            
+        Returns:
+            The citation count, or 0 if it cannot be fetched.
+        """
         if not pmid:
             return 0
         
         nih_url = f"https://icite.od.nih.gov/api/pubs?pmids={pmid}"
         try:
-            time.sleep(0.2)
+            time.sleep(0.2) # 200ms delay to be polite to the iCite API.
             self.logger.debug(f"Fetching citation count for PMID {pmid} from NIH iCite API.")
             nih_response = requests.get(nih_url, timeout=REQUEST_TIMEOUT)
             nih_response.raise_for_status()
@@ -45,6 +70,15 @@ class PubmedSearcher(BaseSearcher):
         return 0
     
     def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        """
+        Searches PubMed for articles matching the given criteria.
+        
+        Args:
+            query: The search term.
+            limit: The maximum number of results to return.
+            search_type: The type of search ('keyword', 'title', 'author').
+            filters: A dictionary of filters to apply (year, citations).
+        """
         self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
         cached_results = self._get_from_cache(query, limit, search_type, filters)
@@ -55,7 +89,7 @@ class PubmedSearcher(BaseSearcher):
         self.clear_results()
         
         try:
-            # Construct query based on search_type
+            # Construct the search term based on the search type using PubMed's tags.
             if search_type == 'title':
                 search_term = f"{query}[Title]"
             elif search_type == 'author':
@@ -63,7 +97,7 @@ class PubmedSearcher(BaseSearcher):
             else: # Default to keyword
                 search_term = query
             
-            # Add date range filter
+            # Add a date range filter to the search term if specified.
             if filters and (filters.get('year_min') or filters.get('year_max')):
                 date_range = ""
                 if filters.get('year_min'):
@@ -73,11 +107,11 @@ class PubmedSearcher(BaseSearcher):
                     date_range += f"{filters['year_max']}/12/31"
                 search_term += f" AND ({date_range}[Date - Publication])"
             
+            # PubMed API does not support direct citation count filtering, so we warn the user.
             if filters and filters.get('min_citations'):
                 self.logger.warning("PubMed API does not support direct citation count filtering. This filter will be applied post-search.")
             
-
-            # Step 1: Use esearch to get a list of PMIDs
+            # --- Step 1: Use esearch to get a list of PMIDs ---
             self._enforce_rate_limit()
             search_params = {
                 'db': 'pubmed',
@@ -104,7 +138,7 @@ class PubmedSearcher(BaseSearcher):
 
             self.logger.info(f"ESEARCH found {len(id_list)} PMIDs. Fetching details...")
             
-            # Step 2: Use efetch to get details for the PMIDs
+            # --- Step 2: Use efetch to get details for the PMIDs ---
             self._enforce_rate_limit()
             fetch_params = {
                 'db': 'pubmed',
@@ -119,6 +153,7 @@ class PubmedSearcher(BaseSearcher):
             self.logger.debug(f"EFETCH response status code: {fetch_response.status_code}")
             fetch_response.raise_for_status()
             
+            # Parse the XML response to extract article details.
             root = ET.fromstring(fetch_response.content)
             
             for article in root.findall('.//PubmedArticle'):
@@ -145,6 +180,7 @@ class PubmedSearcher(BaseSearcher):
                 
                 venue_elem = article_data.find('Journal').find('Title')
                 
+                # Extract DOI from the ArticleIdList.
                 doi = 'N/A'
                 article_id_list = article.find('PubmedData').find('ArticleIdList')
                 if article_id_list is not None:
@@ -158,6 +194,7 @@ class PubmedSearcher(BaseSearcher):
                 pmid = article.find('MedlineCitation').get('PMID')
                 if pmid:
                     url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                    # Fetch citation count using the helper method.
                     citation_count = self._fetch_citation_count(pmid)
                 else:
                     url = 'N/A'

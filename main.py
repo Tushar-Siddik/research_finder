@@ -1,3 +1,14 @@
+"""
+Main entry point for the Research Article Finder tool.
+
+This script orchestrates the entire search process:
+1. Validates the application configuration.
+2. Gathers search parameters (query, type, filters, vendors) from the user.
+3. Initializes and runs searches across multiple academic databases.
+4. Aggregates and de-duplicates the results.
+5. Provides an option to export the final results in various formats.
+"""
+
 import argparse
 import logging
 from research_finder.aggregator import Aggregator
@@ -13,7 +24,8 @@ from config import LOG_LEVEL, LOG_FORMAT, LOG_FILE
 from research_finder.validator import validate_config
 from typing import Dict, Any
 
-# We will handle the optional Google Scholar import here
+# Handle optional imports for searchers that may not have their dependencies installed.
+# This allows the tool to run with a subset of searchers if some packages are missing.
 try:
     from research_finder.searchers.google_scholar import GoogleScholarSearcher
     GOOGLE_SCHOLAR_AVAILABLE = True
@@ -32,9 +44,14 @@ except ImportError:
 
 
 def setup_logging():
-    """Configure basic logging for the application."""
+    """Configures basic logging for the application.
+    
+    Sets up logging to output to the console. If a LOG_FILE is specified
+    in the configuration, it also adds a file handler to log to a file.
+    """
     handlers = [logging.StreamHandler()]
     
+    # Add a file handler if LOG_FILE is set in the environment variables.
     if LOG_FILE:
         try:
             file_handler = logging.FileHandler(LOG_FILE, mode='w', encoding='utf-8')
@@ -50,10 +67,22 @@ def setup_logging():
     )
 
 def get_user_input():
-    """Gets search parameters from the user via command-line prompts."""
+    """Collects all necessary search parameters from the user via command-line prompts.
+    
+    This function guides the user through a series of questions to define the search query,
+    the type of search, the maximum number of results, and cache management options.
+    
+    Returns:
+        A tuple containing:
+        - query (str): The search term.
+        - limit (int): The maximum number of results per source.
+        - clear_cache (bool): Whether to clear all cache.
+        - clear_expired (bool): Whether to clear only expired cache.
+        - search_type (str): The type of search ('keyword', 'title', or 'author').
+    """
     print("\n--- Research Article Finder ---")
     
-    # Ask for search type first
+    # --- Step 1: Get Search Type ---
     print("What would you like to search by?")
     print("1. Keywords (in title, abstract, etc.)")
     print("2. Title")
@@ -71,13 +100,14 @@ def get_user_input():
         else:
             print("Invalid option. Please enter 1, 2, or 3.")
 
-    # Prompt text changes based on search type
+    # --- Step 2: Get Search Query ---
     prompt_text = f"Enter {search_type} to search for: "
     query = input(prompt_text).strip()
     if not query:
         print(f"Search {search_type} cannot be empty. Exiting.")
         exit()
     
+    # --- Step 3: Get Result Limit ---
     while True:
         try:
             limit_str = input("Enter max results per source (e.g., 10): ").strip()
@@ -89,7 +119,7 @@ def get_user_input():
         except ValueError:
             print("Invalid input. Please enter a number.")
     
-    # Improved cache management options
+    # --- Step 4: Get Cache Management Option ---
     print("\n--- Cache Management ---")
     print("1. Don't clear cache (use existing cached results)")
     print("2. Clear only expired cache entries")
@@ -105,16 +135,18 @@ def get_user_input():
         else:
             print("Invalid option. Please enter 1, 2, or 3.")
     
-    # Convert to boolean flags for backward compatibility
+    # Convert the user's choice into boolean flags for later use.
     clear_cache = (cache_option == "3")
     clear_expired = (cache_option == "2")
             
-    # No longer returns output_file or export_format
     return query, limit, clear_cache, clear_expired, search_type
 
 def get_filter_options() -> Dict[str, Any]:
-    """
-    Asks the user for filtering options and returns them in a dictionary.
+    """Prompts the user to set optional filters for the search results.
+    
+    Returns:
+        A dictionary containing the chosen filters, e.g., {'year_min': 2020}.
+        Returns an empty dict if no filters are selected.
     """
     print("\n--- Filter Search Results (Optional) ---")
     print("Would you like to apply any filters to the search results?")
@@ -125,7 +157,7 @@ def get_filter_options() -> Dict[str, Any]:
             filters = {}
             print("\n--- Set Filter Criteria ---")
             
-            # Year Range Filter
+            # --- Year Range Filter ---
             while True:
                 year_choice = input("Filter by publication year? (y/n, default=n): ").strip().lower()
                 if year_choice in ['y', 'yes']:
@@ -149,7 +181,7 @@ def get_filter_options() -> Dict[str, Any]:
                 else:
                     print("Invalid input. Please enter 'y' or 'n'.")
 
-            # Citation Count Filter
+            # --- Citation Count Filter ---
             while True:
                 citation_choice = input("Filter by minimum citation count? (y/n, default=n): ").strip().lower()
                 if citation_choice in ['y', 'yes']:
@@ -178,10 +210,12 @@ def get_filter_options() -> Dict[str, Any]:
 
 
 def get_searcher_selection():
+    """Displays a menu of available searchers and gets the user's selection.
+    
+    Returns:
+        A list of searcher classes selected by the user.
     """
-    Displays a menu of available searchers and gets the user's selection.
-    """
-    # Define the list of available searchers
+    # Define the list of available searchers.
     # Each item is a tuple: (Display Name, Searcher Class)
     available_searchers = [
         ("Semantic Scholar", SemanticScholarSearcher),
@@ -189,6 +223,7 @@ def get_searcher_selection():
         ("PubMed", PubmedSearcher),
         ("CrossRef", CrossrefSearcher)
     ]
+    # Add optional searchers to the list if their dependencies are available.
     if PYALEX_AVAILABLE:
         available_searchers.append(("OpenAlex", OpenAlexSearcher))
     if GOOGLE_SCHOLAR_AVAILABLE:
@@ -201,16 +236,16 @@ def get_searcher_selection():
     while True:
         choice_str = input(f"Enter vendor numbers to use (e.g., 1,2) or press Enter for all: ").strip()
         
-        # If user presses Enter, select all
+        # If user presses Enter, select all available searchers.
         if not choice_str:
             return [searcher_class for (_, searcher_class) in available_searchers]
 
         try:
-            # Parse comma-separated numbers
+            # Parse comma-separated numbers into a list of integers.
             chosen_indices = [int(num.strip()) for num in choice_str.split(',')]
             selected_searchers = []
             
-            # Validate choices
+            # Validate choices and map them to searcher classes.
             for index in chosen_indices:
                 if 1 <= index <= len(available_searchers):
                     selected_searchers.append(available_searchers[index - 1][1])
@@ -232,6 +267,7 @@ def main():
     logger = logging.getLogger("Main")
 
     # --- VALIDATE CONFIGURATION AT STARTUP ---
+    # This ensures all necessary settings and directories are in place before proceeding.
     errors, warnings = validate_config()
     if errors:
         print("\nConfiguration validation failed with critical errors. Please address them and restart.")
@@ -244,22 +280,24 @@ def main():
     else:
         print("\nConfiguration validation successful. All settings are OK.")
 
-    # 1. Get user input for the search (now only search-related)
+    # --- GATHER USER INPUT ---
+    # 1. Get core search parameters.
     query, limit, clear_cache, _, search_type = get_user_input()
     
-    # Get filter options from the user
+    # 2. Get optional filter criteria.
     filters = get_filter_options()
     logger.debug(f"User input received - Type: {search_type}, Query: '{query}', Limit: {limit}, Filters: {filters}")
 
-    # 2. Get user's choice of search vendors
+    # 3. Get user's choice of search vendors.
     selected_searcher_classes = get_searcher_selection()
     logger.debug(f"Selected searchers: {[cls.__name__ for cls in selected_searcher_classes]}")
 
-    # 3. Initialize Components
+    # --- INITIALIZE CORE COMPONENTS ---
     aggregator = Aggregator()
     exporter = Exporter()
     
-    # 4. Handle cache clearing if requested
+    # --- HANDLE CACHE ---
+    # 4. Handle cache clearing based on user's choice.
     if clear_cache:
         aggregator.clear_cache()
         logger.info("All cache cleared.")
@@ -267,7 +305,8 @@ def main():
         aggregator.clear_expired_cache()
         logger.info("Expired cache entries cleared.")
 
-    # 5. Instantiate and add the selected searchers to the Aggregator
+    # --- SETUP SEARCHERS ---
+    # 5. Instantiate and add the selected searchers to the Aggregator.
     for searcher_class in selected_searcher_classes:
         try:
             searcher = searcher_class(cache_manager=aggregator.cache_manager)
@@ -277,10 +316,12 @@ def main():
         except Exception as e:
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
-    # 6. Run Searches and Get Results
+    # --- EXECUTE SEARCH ---
+    # 6. Run searches across all selected vendors and aggregate the results.
     all_articles = list(aggregator.run_all_searches(query, limit, search_type, filters=filters, stream=True))
 
-    # 7. Display the Error Recovery Summary
+    # --- DISPLAY SUMMARY ---
+    # 7. Display a summary of which searches succeeded or failed.
     print("\n--- Search Summary ---")
     summary = aggregator.get_last_run_summary()
     
@@ -293,7 +334,8 @@ def main():
         
     print("----------------------\n")
 
-    # --- NEW: Post-Search Export Logic ---
+    # --- POST-SEARCH EXPORT ---
+    # 8. Handle the post-search export logic.
     if not all_articles:
         logger.info("No articles found to export.")
         print("No articles found matching your criteria.")
@@ -336,7 +378,7 @@ def main():
             if not output_file:
                 output_file = f"{query}_search_results"
             
-            # 8. Export Results
+            # Export Results
             exporter.export(all_articles, output_file, export_format)
             break # Exit the loop after successful export
 

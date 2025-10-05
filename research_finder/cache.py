@@ -1,3 +1,12 @@
+"""
+Caching module for the Research Article Finder tool.
+
+This module provides the CacheManager class, which handles caching of search results
+to avoid repeated API calls. It stores results in JSON files on disk, with a configurable
+expiry time. Cache keys are generated based on query parameters to ensure that different
+searches are cached separately.
+"""
+
 import os
 import json
 import hashlib
@@ -7,47 +16,60 @@ from pathlib import Path
 import logging
 
 class CacheManager:
-    """Manages caching of search results to avoid repeated API calls."""
+    """
+    Manages caching of search results to avoid repeated API calls.
+    
+    The cache stores results as JSON files on disk. Each cache entry is identified by a unique
+    key generated from the search query, source, limit, search type, and filters. Cache entries
+    have a configurable expiry time after which they are considered stale.
+    """
     
     def __init__(self, cache_dir: str = "cache", expiry_hours: int = 24):
         """
         Initialize the cache manager.
         
         Args:
-            cache_dir: Directory to store cache files
-            expiry_hours: Number of hours after which cache entries expire
+            cache_dir: The directory to store cache files.
+            expiry_hours: The number of hours after which cache entries expire.
         """
         self.cache_dir = Path(cache_dir)
         self.expiry_seconds = expiry_hours * 3600
         self.logger = logging.getLogger("CacheManager")
         
-        # Create cache directory if it doesn't exist
+        # Create the cache directory if it doesn't exist.
         self.cache_dir.mkdir(exist_ok=True)
         
     def _generate_cache_key(self, query: str, source: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> str:
         """
         Generate a unique cache key based on query parameters.
         
+        The key is a hash of a normalized string containing all relevant search parameters.
+        This ensures that different queries, sources, or filters result in different cache files.
+        
         Args:
-            query: Search query
-            source: Source name (e.g., "arXiv", "Semantic Scholar")
-            limit: Maximum number of results
+            query: The search query.
+            source: The source name (e.g., "arXiv", "Semantic Scholar").
+            limit: The maximum number of results.
+            search_type: The type of search ('keyword', 'title', 'author').
+            filters: A dictionary of filters applied to the search.
             
         Returns:
-            A unique cache key
+            A unique MD5 hash to be used as the cache filename.
         """
+        # Create a string representation of the filters for the key.
         filter_str = ""
         if filters:
+            # Sort filters to ensure consistent key generation regardless of dict order.
             sorted_filters = sorted(filters.items())
             filter_str = "_" + "_".join(f"{k}_{v}" for k, v in sorted_filters if v is not None)
         
-        # Create a normalized string from the parameters
+        # Create a normalized string from the parameters.
         key_string = f"{query.lower()}_{source}_{limit}_{search_type}{filter_str}"
-        # Generate a hash to use as filename
+        # Generate a hash to use as filename.
         return hashlib.md5(key_string.encode()).hexdigest()
     
     def _get_cache_path(self, cache_key: str) -> Path:
-        """Get the full path to a cache file."""
+        """Get the full path to a cache file given its key."""
         return self.cache_dir / f"{cache_key}.json"
     
     def _is_cache_valid(self, cache_path: Path) -> bool:
@@ -55,21 +77,31 @@ class CacheManager:
         Check if a cache file exists and is not expired.
         
         Args:
-            cache_path: Path to the cache file
+            cache_path: The Path object for the cache file.
             
         Returns:
-            True if cache is valid, False otherwise
+            True if the cache is valid, False otherwise.
         """
         if not cache_path.exists():
             return False
             
-        # Check if file is older than expiry time
+        # Check if the file's modification time is within the expiry period.
         file_age = time.time() - cache_path.stat().st_mtime
         return file_age < self.expiry_seconds
     
     def get(self, query: str, source: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> Optional[List[Dict[str, Any]]]:
         """
-        Retrieve cached results for a query.
+        Retrieve cached results for a given set of search parameters.
+        
+        Args:
+            query: The search query.
+            source: The source name.
+            limit: The maximum number of results.
+            search_type: The type of search.
+            filters: The filters applied to the search.
+            
+        Returns:
+            The cached list of results if found and valid, otherwise None.
         """
         cache_key = self._generate_cache_key(query, source, limit, search_type, filters)
         cache_path = self._get_cache_path(cache_key)
@@ -82,16 +114,25 @@ class CacheManager:
             except (json.JSONDecodeError, IOError) as e:
                 self.logger.error(f"Error reading cache file {cache_path}: {e}")
         
+        self.logger.info(f"Cache miss for {source} query: '{query}' (type: {search_type}, filters: {filters})")
         return None
     
     def set(self, query: str, source: str, limit: int, results: List[Dict[str, Any]], search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
         """
-        Store search results in cache.
+        Store search results in the cache.
+        
+        Args:
+            query: The search query.
+            source: The source name.
+            limit: The maximum number of results.
+            results: The search results to cache.
+            search_type: The type of search.
+            filters: The filters applied to the search.
         """
         if not results:
+            self.logger.debug(f"No results to cache for {source} query: '{query}'")
             return
             
-        # Pass filters to helper methods
         cache_key = self._generate_cache_key(query, source, limit, search_type, filters)
         cache_path = self._get_cache_path(cache_key)
         

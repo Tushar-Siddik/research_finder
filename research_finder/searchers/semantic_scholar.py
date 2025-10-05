@@ -1,3 +1,11 @@
+"""
+Searcher for the Semantic Scholar API.
+
+This module implements the SemanticScholarSearcher class, which interacts with the Semantic Scholar
+Graph API to find academic papers. It supports searching by keyword, title, and author, and
+can filter results by year and citation count.
+"""
+
 from pathlib import Path
 import sys
 from typing import Dict, Any
@@ -13,17 +21,34 @@ class SemanticScholarSearcher(BaseSearcher):
     BASE_URL = SEMANTIC_SCHOLAR_API_URL
 
     def __init__(self, cache_manager=None):
+        """
+        Initializes the SemanticScholarSearcher.
+        
+        Args:
+            cache_manager: An optional CacheManager instance.
+        """
         super().__init__("Semantic Scholar", cache_manager)
         self.api_key = S2_API_KEY
         
+        # Adjust the rate limit based on whether an API key is provided.
         if self._check_api_key("Semantic Scholar API key", self.api_key):
             self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_WITH_KEY
         else:
             self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
 
     def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        """
+        Searches Semantic Scholar for papers matching the given criteria.
+        
+        Args:
+            query: The search term.
+            limit: The maximum number of results to return.
+            search_type: The type of search ('keyword', 'title', 'author').
+            filters: A dictionary of filters to apply (year, citations).
+        """
         self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
+        # Check cache before making an API request.
         cached_results = self._get_from_cache(query, limit, search_type, filters)
         if cached_results:
             self.results = cached_results
@@ -31,14 +56,14 @@ class SemanticScholarSearcher(BaseSearcher):
             
         self.clear_results()
         
-        # Construct query based on search_type
+        # Construct the query based on the search type.
         # S2 API doesn't have specific fields for title/author in this endpoint,
         # so we construct the query string for a best-effort search.
         api_query = query
         if search_type == 'title':
-            api_query = f'"{query}"'
+            api_query = f'"{query}"' # Exact phrase match for title.
         elif search_type == 'author':
-            api_query = f'author:"{query}"'
+            api_query = f'author:"{query}"' # Search within author field.
         
         params = {
             'query': api_query,
@@ -46,7 +71,7 @@ class SemanticScholarSearcher(BaseSearcher):
             'fields': 'title,authors,year,abstract,url,citationCount,venue,openAccessPdf,externalIds'
         }
         
-        # Add filters to params
+        # Add filters to the request parameters.
         if filters:
             if filters.get('year_min') and filters.get('year_max'):
                 params['year'] = f"{filters['year_min']}-{filters['year_max']}"
@@ -58,6 +83,7 @@ class SemanticScholarSearcher(BaseSearcher):
             if filters.get('min_citations'):
                 params['minCitationCount'] = filters['min_citations']
         
+        # Set up headers, including the API key if available.
         headers = {}
         if self.api_key:
             headers['x-api-key'] = self.api_key
@@ -66,6 +92,7 @@ class SemanticScholarSearcher(BaseSearcher):
             self.logger.debug("No API key provided. Request will be unauthenticated.")
         
         try:
+            # Enforce rate limit before making the request.
             self._enforce_rate_limit()
             
             self.logger.debug(f"Making GET request to {self.BASE_URL} with params: {params}")
@@ -81,22 +108,26 @@ class SemanticScholarSearcher(BaseSearcher):
             response.raise_for_status()
             data = response.json()
             
+            # Parse the JSON response and extract paper details.
             items = data.get('data', [])
             self.logger.debug(f"Successfully parsed JSON. Found {len(items)} items in 'data' field.")
             
             for item in items:
                 authors_list = [author.get('name') for author in item.get('authors', [])]
                 
+                # Extract DOI from the externalIds field.
                 doi = 'N/A'
                 external_ids = item.get('externalIds')
                 if isinstance(external_ids, dict):
                     doi = external_ids.get('DOI', 'N/A')
                 
+                # Extract license information from the openAccessPdf field.
                 license_info = 'N/A'
                 open_access_pdf = item.get('openAccessPdf', {})
                 if open_access_pdf:
                     license_info = normalize_string(open_access_pdf.get('license'))
 
+                # Standardize the paper data into the common format.
                 paper = {
                     'Title': normalize_string(item.get('title')),
                     'Authors': clean_author_list(authors_list),
@@ -111,12 +142,14 @@ class SemanticScholarSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
+            # Save the results to cache.
             self._save_to_cache(query, limit, search_type, filters)
             self.logger.info(f"Found and stored {len(self.results)} papers from Semantic Scholar.")
             
         except requests.exceptions.Timeout:
             self.logger.error("Request to Semantic Scholar API timed out.", exc_info=True)
         except requests.exceptions.HTTPError as e:
+            # Handle specific HTTP errors like authentication or rate limiting.
             if e.response.status_code == 401:
                 self.logger.error("Authentication failed. Please check your Semantic Scholar API key.", exc_info=True)
             elif e.response.status_code == 429:

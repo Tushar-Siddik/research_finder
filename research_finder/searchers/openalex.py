@@ -1,7 +1,9 @@
-# research_finder/searchers/openalex.py
-
 """
-OpenAlex Searcher Module
+OpenAlex Searcher Module.
+
+This module implements the OpenAlexSearcher class, which interacts with the OpenAlex API
+using the 'pyalex' Python package. OpenAlex provides a comprehensive, open catalog of the global
+research system. This searcher supports filtering by publication year and citation count.
 """
 
 import logging
@@ -32,11 +34,18 @@ class OpenAlexSearcher(BaseSearcher):
     """Searcher for the OpenAlex API using the pyalex package."""
     
     def __init__(self, cache_manager=None):
+        """
+        Initializes the OpenAlexSearcher.
+        
+        Args:
+            cache_manager: An optional CacheManager instance.
+        """
         if not PYALEX_AVAILABLE:
             raise ImportError("pyalex package not found. Install with 'pip install pyalex'")
         
         super().__init__("OpenAlex", cache_manager)
         
+        # Configure the pyalex library with an email for better rate limits if provided.
         if self._check_api_key("OpenAlex 'polite pool' email", OPENALEX_EMAIL):
             pyalex.config.email = OPENALEX_EMAIL
             self.rate_limit = OPENALEX_RATE_LIMIT_WITH_EMAIL
@@ -44,6 +53,15 @@ class OpenAlexSearcher(BaseSearcher):
             self.rate_limit = OPENALEX_RATE_LIMIT_NO_EMAIL
     
     def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        """
+        Searches OpenAlex for works matching the given criteria.
+        
+        Args:
+            query: The search term.
+            limit: The maximum number of results to return.
+            search_type: The type of search ('keyword', 'title', 'author').
+            filters: A dictionary of filters to apply (year, citations).
+        """
         self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
         cached_results = self._get_from_cache(query, limit, search_type, filters)
@@ -56,12 +74,13 @@ class OpenAlexSearcher(BaseSearcher):
         try:
             self._enforce_rate_limit()
             
+            # Define the fields we want to retrieve from the OpenAlex API.
             fields_to_select = (
                 "id,display_name,publication_year,primary_location,"
                 "authorships,cited_by_count,open_access,doi,type,best_oa_location"
             )
             
-            # Construct query based on search_type
+            # Construct the query using the pyalex library's fluent interface.
             works_query = Works().select(fields_to_select)
             if search_type == 'title':
                 works_query = works_query.filter(title={"search": query})
@@ -70,7 +89,7 @@ class OpenAlexSearcher(BaseSearcher):
             else: # Default to keyword
                 works_query = works_query.search(query)
 
-            # Add filters
+            # Apply filters using pyalex's filter method.
             if filters:
                 if filters.get('year_min') or filters.get('year_max'):
                     year_filter = {}
@@ -98,6 +117,7 @@ class OpenAlexSearcher(BaseSearcher):
                 
                 primary_location = item.get('primary_location') or {}
                 
+                # Extract license information from the best_oa_location field.
                 license_info = 'N/A'
                 oa_location = item.get('best_oa_location')
                 if oa_location and oa_location.get('license'):

@@ -1,8 +1,26 @@
+# Core dependencies for the Research Article Finder tool.
+# Install with: pip install -r requirements.txt
+
+# For making HTTP requests to various APIs
 requests
+
+# For data manipulation and Excel export
 pandas
+
+# For parsing XML responses from the arXiv API
 feedparser
+
+# For unofficially scraping Google Scholar (use with caution)
 scholarly
+
+# For loading environment variables from a .env file
 python-dotenv
+
+# For interacting with the OpenAlex API
 pyalex
+
+# For displaying a progress bar during searches
 tqdm
+
+# Required by pandas for writing to .xlsx Excel files
 openpyxl

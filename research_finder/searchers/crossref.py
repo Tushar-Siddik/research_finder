@@ -1,3 +1,11 @@
+"""
+Searcher for the CrossRef API.
+
+This module implements the CrossrefSearcher class, which interacts with the CrossRef API
+to find scholarly works. It supports searching by keyword, title, and author, and can
+filter results by publication year. Citation count filtering is done post-search.
+"""
+
 import requests
 from datetime import datetime
 from .base_searcher import BaseSearcher
@@ -14,15 +22,31 @@ class CrossrefSearcher(BaseSearcher):
     BASE_URL = CROSSREF_API_URL
 
     def __init__(self, cache_manager=None):
+        """
+        Initializes the CrossrefSearcher.
+        
+        Args:
+            cache_manager: An optional CacheManager instance.
+        """
         super().__init__("CrossRef", cache_manager)
         self.mailto = CROSSREF_MAILTO
 
+        # Adjust the rate limit based on whether a 'mailto' email is provided for the polite pool.
         if self._check_api_key("CrossRef 'mailto' email", self.mailto):
             self.rate_limit = CROSSREF_RATE_LIMIT_WITH_KEY
         else:
             self.rate_limit = CROSSREF_RATE_LIMIT_NO_KEY
 
     def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        """
+        Searches CrossRef for works matching the given criteria.
+        
+        Args:
+            query: The search term.
+            limit: The maximum number of results to return.
+            search_type: The type of search ('keyword', 'title', 'author').
+            filters: A dictionary of filters to apply (year, citations).
+        """
         self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
         cached_results = self._get_from_cache(query, limit, search_type, filters)
@@ -32,12 +56,13 @@ class CrossrefSearcher(BaseSearcher):
             
         self.clear_results()
         
-        # Construct query based on search_type
+        # Construct the query parameters for the CrossRef API.
         params = {
             'rows': limit,
             'select': 'title,author,container-title,DOI,created,license,URL,is-referenced-by-count'
         }
         
+        # Set the main query parameter based on the search type.
         if search_type == 'title':
             params['query.title'] = query
         elif search_type == 'author':
@@ -45,7 +70,7 @@ class CrossrefSearcher(BaseSearcher):
         else: # Default to keyword
             params['query'] = query
         
-        # Add filters
+        # Add year-based filters to the 'filter' parameter.
         filter_parts = []
         if filters:
             if filters.get('year_min'):
@@ -56,9 +81,11 @@ class CrossrefSearcher(BaseSearcher):
         if filter_parts:
             params['filter'] = ','.join(filter_parts)
         
+        # CrossRef API does not support direct citation count filtering.
         if filters and filters.get('min_citations'):
             self.logger.warning("CrossRef API does not support direct citation count filtering. This filter will be applied post-search.")
         
+        # Add the 'mailto' parameter for polite pool access if available.
         if self.mailto:
             params['mailto'] = self.mailto
             self.logger.debug("Using 'mailto' for polite pool access.")
@@ -78,12 +105,13 @@ class CrossrefSearcher(BaseSearcher):
             self.logger.debug(f"Successfully parsed JSON. Found {len(items)} items in 'message.items' field.")
             
             for item in items:
-                # Post-search filtering for citations
+                # Apply post-search filtering for citations since the API doesn't support it.
                 citation_count = normalize_citation_count(item.get('is-referenced-by-count', 0))
                 if filters and filters.get('min_citations'):
                     if citation_count < filters['min_citations']:
-                        continue # Skip this article
+                        continue # Skip this article.
                 
+                # Parse author information.
                 title_list = item.get('title', ['N/A'])
                 authors = []
                 for author in item.get('author', []):
@@ -94,6 +122,7 @@ class CrossrefSearcher(BaseSearcher):
                     elif family:
                         authors.append(family)
                 
+                # Parse the publication year from the 'created' date-time string.
                 year = 'N/A'
                 created_date = item.get('created', {}).get('date-time', '')
                 if created_date:
@@ -104,6 +133,7 @@ class CrossrefSearcher(BaseSearcher):
 
                 venue_list = item.get('container-title', ['N/A'])
                 
+                # Parse license information.
                 license_info = 'N/A'
                 license_list = item.get('license', [])
                 if license_list and isinstance(license_list, list) and len(license_list) > 0:
