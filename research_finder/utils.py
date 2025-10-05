@@ -196,9 +196,35 @@ def format_apa7(paper: dict) -> str:
 
 # --- Keep other helper functions ---
 def normalize_string(text: str) -> str:
+    """
+    Normalizes a string by stripping whitespace, common prefixes, and quotes.
+    """
     if not text or str(text).lower() == 'n/a':
         return 'N/A'
-    text = re.sub(r'\s+', ' ', str(text))
+    
+    text = str(text).strip()
+    
+    # Strip common prefixes from titles (e.g., "Author response for")
+    prefixes_to_strip = [
+        "Author response for ",
+        "Correction to ",
+        "Retraction of ",
+        "Expression of Concern: ",
+        "Reply to ",
+        "Erratum for "
+    ]
+    for prefix in prefixes_to_strip:
+        if text.lower().startswith(prefix.lower()):
+            text = text[len(prefix):].strip()
+            
+    # Strip surrounding quotes (single or double)
+    if (text.startswith('"') and text.endswith('"')) or \
+       (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
+
+    # Replace multiple whitespace characters with a single space
+    text = re.sub(r'\s+', ' ', text)
+    
     return text.strip()
 
 def normalize_year(year_input) -> str:
