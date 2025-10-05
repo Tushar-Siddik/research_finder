@@ -1,3 +1,5 @@
+# main.py
+
 import argparse
 import logging
 from research_finder.aggregator import Aggregator
@@ -10,7 +12,6 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from config import LOG_LEVEL, LOG_FORMAT, LOG_FILE
-# --- IMPORT THE VALIDATOR ---
 from research_finder.validator import validate_config
 
 # We will handle the optional Google Scholar import here
@@ -42,7 +43,7 @@ def setup_logging():
             print(f"Logging to file: {LOG_FILE}")
         except Exception as e:
             print(f"Warning: Could not set up log file. Error: {e}")
-
+            
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL),
         format=LOG_FORMAT,
@@ -57,37 +58,9 @@ def get_user_input():
         print("Search query cannot be empty. Exiting.")
         exit()
 
-    output_file = input("Enter output filename (without extension): ").strip()
-    if not output_file:
-        output_file = f"{query}_search_results"
+    # --- REMOVED: Export format and filename questions ---
+    # These will be asked later, after the search is complete.
     
-    # Get export format
-    print("\n--- Select Export Format ---")
-    print("1. CSV")
-    print("2. JSON")
-    print("3. BibTeX")
-    print("4. RIS")
-    print("5. Excel")
-    
-    format_map = {
-        "1": "csv",
-        "2": "json",
-        "3": "bibtex",
-        "4": "ris",
-        "5": "excel"
-    }
-    
-    while True:
-        format_choice = input("Select export format (1-5, default=1): ").strip()
-        if not format_choice:
-            format_choice = "1"
-            
-        if format_choice in format_map:
-            export_format = format_map[format_choice]
-            break
-        else:
-            print("Invalid option. Please enter 1, 2, 3, 4, or 5.")
-
     while True:
         try:
             limit_str = input("Enter max results per source (e.g., 10): ").strip()
@@ -119,7 +92,9 @@ def get_user_input():
     clear_cache = (cache_option == "3")
     clear_expired = (cache_option == "2")
             
-    return query, output_file, limit, clear_cache, clear_expired, export_format
+    # --- MODIFIED RETURN VALUE ---
+    # No longer returns output_file or export_format
+    return query, limit, clear_cache, clear_expired
 
 def get_searcher_selection():
     """
@@ -188,12 +163,11 @@ def main():
     else:
         print("\nConfiguration validation successful. All settings are OK.")
 
-    # 1. Get user input for the search
-    query, output_file, limit, clear_cache, _, export_format = get_user_input()
+    # 1. Get user input for the search (now only search-related)
+    query, limit, clear_cache, _ = get_user_input()
     
     # --- NEW: Log user configuration for debugging ---
-    logger.debug(f"User input received - Query: '{query}', Limit: {limit}, Format: {export_format}, Output: {output_file}")
-    # --- END OF NEW SECTION ---
+    logger.debug(f"User input received - Query: '{query}', Limit: {limit}")
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
@@ -222,15 +196,9 @@ def main():
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
     # 6. Run Searches and Get Results
-    all_articles = aggregator.run_all_searches(query, limit, stream=True)
+    all_articles = list(aggregator.run_all_searches(query, limit, stream=True))
 
-    # 7. Export Results
-    if all_articles:
-        exporter.export(all_articles, output_file, export_format)
-    else:
-        logger.info("No articles found to export.")
-
-    # 8. Display the Error Recovery Summary
+    # 7. Display the Error Recovery Summary
     print("\n--- Search Summary ---")
     summary = aggregator.get_last_run_summary()
     
@@ -242,6 +210,59 @@ def main():
         print("Please check your API keys or network connection for the failed sources.")
         
     print("----------------------\n")
+
+    # --- NEW: Post-Search Export Logic ---
+    if not all_articles:
+        logger.info("No articles found to export.")
+        print("No articles found matching your criteria.")
+        return
+
+    print(f"Found {len(all_articles)} unique articles.")
+    
+    while True:
+        export_choice = input("Would you like to export these results? (y/n): ").strip().lower()
+        if export_choice in ['y', 'yes']:
+            # Get export format
+            print("\n--- Select Export Format ---")
+            print("1. CSV")
+            print("2. JSON")
+            print("3. BibTeX")
+            print("4. RIS")
+            print("5. Excel")
+            
+            format_map = {
+                "1": "csv",
+                "2": "json",
+                "3": "bibtex",
+                "4": "ris",
+                "5": "excel"
+            }
+            
+            while True:
+                format_choice = input("Select export format (1-5, default=1): ").strip()
+                if not format_choice:
+                    format_choice = "1"
+                    
+                if format_choice in format_map:
+                    export_format = format_map[format_choice]
+                    break
+                else:
+                    print("Invalid option. Please enter 1, 2, 3, 4, or 5.")
+
+            # Get output filename
+            output_file = input("Enter output filename (without extension): ").strip()
+            if not output_file:
+                output_file = f"{query}_search_results"
+            
+            # 8. Export Results
+            exporter.export(all_articles, output_file, export_format)
+            break # Exit the loop after successful export
+
+        elif export_choice in ['n', 'no']:
+            print("Exiting without exporting.")
+            break # Exit the loop
+        else:
+            print("Invalid input. Please enter 'y' or 'n'.")
         
 if __name__ == "__main__":
     main()
