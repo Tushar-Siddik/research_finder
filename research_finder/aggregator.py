@@ -1,9 +1,9 @@
 from pathlib import Path
 import logging
-from typing import List, Iterator, Union, Dict
+from typing import List, Iterator, Union, Dict, Any
 from .searchers.base_searcher import BaseSearcher
 from .cache import CacheManager
-from tqdm import tqdm  # <-- Import tqdm
+from tqdm import tqdm
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import CACHE_DIR, CACHE_EXPIRY_HOURS
@@ -29,7 +29,7 @@ class Aggregator:
         else:
             self.logger.error(f"Failed to add searcher: {searcher} is not a valid BaseSearcher instance.")
     
-    def _process_searchers(self, query: str, limit: int, search_type: str) -> Iterator[dict]:
+    def _process_searchers(self, query: str, limit: int, search_type: str, filters: Dict[str, Any]) -> Iterator[dict]:
         """
         Internal helper to iterate through searchers, find articles, and yield results.
         This method contains the core logic for searching and deduplication.
@@ -48,7 +48,7 @@ class Aggregator:
             
             try:
                 # Pass search_type to the search method
-                searcher.search(query, limit, search_type)
+                searcher.search(query, limit, search_type, filters)
                 raw_results = searcher.get_results()
                 self.logger.debug(f"{searcher.name} returned {len(raw_results)} raw results.")
                 
@@ -88,18 +88,18 @@ class Aggregator:
         pbar.close()
         self.logger.info(f"Aggregation complete. Total unique articles yielded: {total_yielded}")
 
-    def run_all_searches(self, query: str, limit: int, search_type: str = 'keyword', stream: bool = False) -> Union[List[dict], Iterator[dict]]:
+    def run_all_searches(self, query: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None, stream: bool = False) -> Union[List[dict], Iterator[dict]]:
         """
         Runs the search query on all added searchers.
         """
-        self.logger.info(f"--- Starting search for '{query}' (type: {search_type}) across {len(self.searchers)} vendors ---")
+        self.logger.info(f"--- Starting search for '{query}' (type: {search_type}, filters: {filters}) across {len(self.searchers)} vendors ---")
 
         if stream:
             # For streaming, we just return the generator directly
-            return self._process_searchers(query, limit, search_type)
+            return self._process_searchers(query, limit, search_type, filters or {})
         else:
             # For non-streaming, we consume the generator into a list
-            all_results = list(self._process_searchers(query, limit, search_type))
+            all_results = list(self._process_searchers(query, limit, search_type, filters or {}))
             self.logger.info(f"--- Search complete. Total unique results found: {len(all_results)} ---")
             return all_results
 

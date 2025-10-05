@@ -7,6 +7,7 @@ OpenAlex Searcher Module
 import logging
 from .base_searcher import BaseSearcher
 import sys
+from typing import Dict, Any
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string, normalize_citation_count
@@ -42,10 +43,10 @@ class OpenAlexSearcher(BaseSearcher):
         else:
             self.rate_limit = OPENALEX_RATE_LIMIT_NO_EMAIL
     
-    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
-        cached_results = self._get_from_cache(query, limit, search_type)
+        cached_results = self._get_from_cache(query, limit, search_type, filters)
         if cached_results:
             self.results = cached_results
             return
@@ -68,6 +69,17 @@ class OpenAlexSearcher(BaseSearcher):
                 works_query = works_query.filter(author={"display_name": query})
             else: # Default to keyword
                 works_query = works_query.search(query)
+
+            # Add filters
+            if filters:
+                if filters.get('year_min') or filters.get('year_max'):
+                    year_filter = {}
+                    if filters.get('year_min'): year_filter['>='] = filters['year_min']
+                    if filters.get('year_max'): year_filter['<='] = filters['year_max']
+                    works_query = works_query.filter(publication_year=year_filter)
+                
+                if filters.get('min_citations'):
+                    works_query = works_query.filter(cited_by_count={">=": filters['min_citations']})
 
             self.logger.debug(f"Executing pyalex query: {works_query}")
             results = works_query.get(per_page=limit)
@@ -105,7 +117,7 @@ class OpenAlexSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit, search_type)
+            self._save_to_cache(query, limit, search_type, filters)
             self.logger.info(f"Found and stored {len(self.results)} papers from OpenAlex.")
             
         except Exception as e:

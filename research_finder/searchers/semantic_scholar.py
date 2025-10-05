@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from typing import Dict, Any
 sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
 from .base_searcher import BaseSearcher
@@ -20,10 +21,10 @@ class SemanticScholarSearcher(BaseSearcher):
         else:
             self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
 
-    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
         
-        cached_results = self._get_from_cache(query, limit, search_type)
+        cached_results = self._get_from_cache(query, limit, search_type, filters)
         if cached_results:
             self.results = cached_results
             return
@@ -35,15 +36,27 @@ class SemanticScholarSearcher(BaseSearcher):
         # so we construct the query string for a best-effort search.
         api_query = query
         if search_type == 'title':
-            api_query = f'"{query}"' # Exact phrase match for title
+            api_query = f'"{query}"'
         elif search_type == 'author':
-            api_query = f'author:"{query}"' # Search within author field
+            api_query = f'author:"{query}"'
         
         params = {
             'query': api_query,
             'limit': limit,
             'fields': 'title,authors,year,abstract,url,citationCount,venue,openAccessPdf,externalIds'
         }
+        
+        # Add filters to params
+        if filters:
+            if filters.get('year_min') and filters.get('year_max'):
+                params['year'] = f"{filters['year_min']}-{filters['year_max']}"
+            elif filters.get('year_min'):
+                params['year'] = f"{filters['year_min']}-"
+            elif filters.get('year_max'):
+                params['year'] = f"-{filters['year_max']}"
+            
+            if filters.get('min_citations'):
+                params['minCitationCount'] = filters['min_citations']
         
         headers = {}
         if self.api_key:
@@ -98,7 +111,7 @@ class SemanticScholarSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit, search_type)
+            self._save_to_cache(query, limit, search_type, filters)
             self.logger.info(f"Found and stored {len(self.results)} papers from Semantic Scholar.")
             
         except requests.exceptions.Timeout:

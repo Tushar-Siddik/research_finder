@@ -24,7 +24,7 @@ class CacheManager:
         # Create cache directory if it doesn't exist
         self.cache_dir.mkdir(exist_ok=True)
         
-    def _generate_cache_key(self, query: str, source: str, limit: int, search_type: str = 'keyword') -> str:
+    def _generate_cache_key(self, query: str, source: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> str:
         """
         Generate a unique cache key based on query parameters.
         
@@ -36,8 +36,13 @@ class CacheManager:
         Returns:
             A unique cache key
         """
+        filter_str = ""
+        if filters:
+            sorted_filters = sorted(filters.items())
+            filter_str = "_" + "_".join(f"{k}_{v}" for k, v in sorted_filters if v is not None)
+        
         # Create a normalized string from the parameters
-        key_string = f"{query.lower()}_{source}_{limit}_{search_type}"
+        key_string = f"{query.lower()}_{source}_{limit}_{search_type}{filter_str}"
         # Generate a hash to use as filename
         return hashlib.md5(key_string.encode()).hexdigest()
     
@@ -62,38 +67,38 @@ class CacheManager:
         file_age = time.time() - cache_path.stat().st_mtime
         return file_age < self.expiry_seconds
     
-    def get(self, query: str, source: str, limit: int, search_type: str = 'keyword') -> Optional[List[Dict[str, Any]]]:
+    def get(self, query: str, source: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> Optional[List[Dict[str, Any]]]:
         """
         Retrieve cached results for a query.
         """
-        cache_key = self._generate_cache_key(query, source, limit, search_type)
+        cache_key = self._generate_cache_key(query, source, limit, search_type, filters)
         cache_path = self._get_cache_path(cache_key)
         
         if self._is_cache_valid(cache_path):
             try:
                 with open(cache_path, 'r', encoding='utf-8') as f:
-                    self.logger.info(f"Cache hit for {source} query: '{query}' (type: {search_type})")
+                    self.logger.info(f"Cache hit for {source} query: '{query}' (type: {search_type}, filters: {filters})")
                     return json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 self.logger.error(f"Error reading cache file {cache_path}: {e}")
         
         return None
     
-    def set(self, query: str, source: str, limit: int, results: List[Dict[str, Any]], search_type: str = 'keyword') -> None:
+    def set(self, query: str, source: str, limit: int, results: List[Dict[str, Any]], search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
         """
         Store search results in cache.
         """
         if not results:
-            self.logger.debug(f"No results to cache for {source} query: '{query}'")
             return
             
-        cache_key = self._generate_cache_key(query, source, limit, search_type)
+        # Pass filters to helper methods
+        cache_key = self._generate_cache_key(query, source, limit, search_type, filters)
         cache_path = self._get_cache_path(cache_key)
         
         try:
             with open(cache_path, 'w', encoding='utf-8') as f:
                 json.dump(results, f, ensure_ascii=False)
-                self.logger.info(f"Cached {len(results)} results for {source} query: '{query}' (type: {search_type})")
+                self.logger.info(f"Cached {len(results)} results for {source} query: '{query}' (type: {search_type}, filters: {filters})")
         except IOError as e:
             self.logger.error(f"Error writing to cache file {cache_path}: {e}")
     

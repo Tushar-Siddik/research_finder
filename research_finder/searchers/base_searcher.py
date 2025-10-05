@@ -16,7 +16,7 @@ class BaseSearcher(ABC):
         self.rate_limit = 1.0
 
     @abstractmethod
-    def search(self, query: str, limit: int, search_type: str = 'keyword') -> None:
+    def search(self, query: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
         """
         Performs a search and populates the self.results list.
         
@@ -24,6 +24,7 @@ class BaseSearcher(ABC):
             query: The search term.
             limit: Maximum number of results to return.
             search_type: The type of search ('keyword', 'title', 'author').
+            filters: A dictionary of filters to apply (e.g., {'year_min': 2020}).
         """
         pass
 
@@ -35,16 +36,16 @@ class BaseSearcher(ABC):
         """Clears the stored results."""
         self.results = []
         
-    def _get_from_cache(self, query: str, limit: int, search_type: str = 'keyword') -> Optional[List[Dict[str, Any]]]:
+    def _get_from_cache(self, query: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> Optional[List[Dict[str, Any]]]:
         """Try to get results from cache."""
         if self.cache_manager:
-            return self.cache_manager.get(query, self.name, limit, search_type)
+            return self.cache_manager.get(query, self.name, limit, search_type, filters)
         return None
         
-    def _save_to_cache(self, query: str, limit: int, search_type: str = 'keyword') -> None:
+    def _save_to_cache(self, query: str, limit: int, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
         """Save results to cache."""
         if self.cache_manager and self.results:
-            self.cache_manager.set(query, self.name, limit, self.results, search_type)
+            self.cache_manager.set(query, self.name, limit, self.results, search_type, filters)
 
     def _check_api_key(self, key_name: str, key_value: str) -> bool:
         """Checks if an API key is available, logs a message, and returns a boolean."""

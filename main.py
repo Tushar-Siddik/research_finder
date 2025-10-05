@@ -1,5 +1,3 @@
-# main.py
-
 import argparse
 import logging
 from research_finder.aggregator import Aggregator
@@ -13,6 +11,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from config import LOG_LEVEL, LOG_FORMAT, LOG_FILE
 from research_finder.validator import validate_config
+from typing import Dict, Any
 
 # We will handle the optional Google Scholar import here
 try:
@@ -109,9 +108,73 @@ def get_user_input():
     clear_cache = (cache_option == "3")
     clear_expired = (cache_option == "2")
             
-    # --- MODIFIED RETURN VALUE ---
     # No longer returns output_file or export_format
     return query, limit, clear_cache, clear_expired, search_type
+
+def get_filter_options() -> Dict[str, Any]:
+    """
+    Asks the user for filtering options and returns them in a dictionary.
+    """
+    print("\n--- Filter Search Results (Optional) ---")
+    print("Would you like to apply any filters to the search results?")
+    
+    while True:
+        choice = input("Apply filters? (y/n, default=n): ").strip().lower()
+        if choice in ['y', 'yes']:
+            filters = {}
+            print("\n--- Set Filter Criteria ---")
+            
+            # Year Range Filter
+            while True:
+                year_choice = input("Filter by publication year? (y/n, default=n): ").strip().lower()
+                if year_choice in ['y', 'yes']:
+                    while True:
+                        try:
+                            year_min = input("Enter start year (e.g., 2020, leave blank for no limit): ").strip()
+                            year_max = input("Enter end year (e.g., 2023, leave blank for no limit): ").strip()
+                            
+                            filters['year_min'] = int(year_min) if year_min else None
+                            filters['year_max'] = int(year_max) if year_max else None
+                            
+                            if filters['year_min'] and filters['year_max'] and filters['year_min'] > filters['year_max']:
+                                print("Start year cannot be after end year. Please try again.")
+                                continue
+                            break
+                        except ValueError:
+                            print("Invalid input. Please enter a valid year.")
+                    break
+                elif year_choice in ['n', 'no', '']:
+                    break
+                else:
+                    print("Invalid input. Please enter 'y' or 'n'.")
+
+            # Citation Count Filter
+            while True:
+                citation_choice = input("Filter by minimum citation count? (y/n, default=n): ").strip().lower()
+                if citation_choice in ['y', 'yes']:
+                    while True:
+                        try:
+                            min_citations = input("Enter minimum citation count (e.g., 50): ").strip()
+                            if min_citations:
+                                filters['min_citations'] = int(min_citations)
+                                break
+                            else:
+                                print("Citation count cannot be empty for this filter.")
+                        except ValueError:
+                            print("Invalid input. Please enter a number.")
+                    break
+                elif citation_choice in ['n', 'no', '']:
+                    break
+                else:
+                    print("Invalid input. Please enter 'y' or 'n'.")
+            
+            return filters
+
+        elif choice in ['n', 'no', '']:
+            return {} # Return empty dict if no filters are chosen
+        else:
+            print("Invalid input. Please enter 'y' or 'n'.")
+
 
 def get_searcher_selection():
     """
@@ -183,8 +246,9 @@ def main():
     # 1. Get user input for the search (now only search-related)
     query, limit, clear_cache, _, search_type = get_user_input()
     
-    # Log user configuration for debugging
-    logger.debug(f"User input received - Type: {search_type}, Query: '{query}', Limit: {limit}")
+    # Get filter options from the user
+    filters = get_filter_options()
+    logger.debug(f"User input received - Type: {search_type}, Query: '{query}', Limit: {limit}, Filters: {filters}")
 
     # 2. Get user's choice of search vendors
     selected_searcher_classes = get_searcher_selection()
@@ -213,7 +277,7 @@ def main():
             logger.error(f"Could not initialize searcher {searcher_class.__name__}: {e}")
 
     # 6. Run Searches and Get Results
-    all_articles = list(aggregator.run_all_searches(query, limit, search_type, stream=True))
+    all_articles = list(aggregator.run_all_searches(query, limit, search_type, filters=filters, stream=True))
 
     # 7. Display the Error Recovery Summary
     print("\n--- Search Summary ---")

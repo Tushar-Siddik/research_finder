@@ -2,6 +2,7 @@ import requests
 from datetime import datetime
 from .base_searcher import BaseSearcher
 import sys
+from typing import Dict, Any
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import CROSSREF_API_URL, REQUEST_TIMEOUT, CROSSREF_MAILTO, CROSSREF_RATE_LIMIT_WITH_KEY, CROSSREF_RATE_LIMIT_NO_KEY
@@ -21,10 +22,10 @@ class CrossrefSearcher(BaseSearcher):
         else:
             self.rate_limit = CROSSREF_RATE_LIMIT_NO_KEY
 
-    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
-        cached_results = self._get_from_cache(query, limit, search_type)
+        cached_results = self._get_from_cache(query, limit, search_type, filters)
         if cached_results:
             self.results = cached_results
             return
@@ -43,6 +44,20 @@ class CrossrefSearcher(BaseSearcher):
             params['query.author'] = query
         else: # Default to keyword
             params['query'] = query
+        
+        # Add filters
+        filter_parts = []
+        if filters:
+            if filters.get('year_min'):
+                filter_parts.append(f"from-pub-date:{filters['year_min']}")
+            if filters.get('year_max'):
+                filter_parts.append(f"until-pub-date:{filters['year_max']}")
+        
+        if filter_parts:
+            params['filter'] = ','.join(filter_parts)
+        
+        if filters and filters.get('min_citations'):
+            self.logger.warning("CrossRef API does not support direct citation count filtering. This filter will be applied post-search.")
         
         if self.mailto:
             params['mailto'] = self.mailto
@@ -63,6 +78,12 @@ class CrossrefSearcher(BaseSearcher):
             self.logger.debug(f"Successfully parsed JSON. Found {len(items)} items in 'message.items' field.")
             
             for item in items:
+                # Post-search filtering for citations
+                citation_count = normalize_citation_count(item.get('is-referenced-by-count', 0))
+                if filters and filters.get('min_citations'):
+                    if citation_count < filters['min_citations']:
+                        continue # Skip this article
+                
                 title_list = item.get('title', ['N/A'])
                 authors = []
                 for author in item.get('author', []):
@@ -102,7 +123,7 @@ class CrossrefSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit, search_type)
+            self._save_to_cache(query, limit, search_type, filters)
             self.logger.info(f"Found and stored {len(self.results)} papers from CrossRef.")
             
         except requests.exceptions.RequestException as e:

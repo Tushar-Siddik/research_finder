@@ -1,6 +1,7 @@
 from .base_searcher import BaseSearcher
 from pathlib import Path
 import sys
+from typing import Dict, Any
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import GOOGLE_SCHOLAR_RATE_LIMIT
 from ..utils import validate_doi, clean_author_list, normalize_year, normalize_string, normalize_citation_count
@@ -20,10 +21,10 @@ class GoogleScholarSearcher(BaseSearcher):
         self.rate_limit = GOOGLE_SCHOLAR_RATE_LIMIT
         self.logger.warning("Google Scholar has no official API. Rate limiting is critical to avoid being blocked.")
     
-    def search(self, query: str, limit: int = 5, search_type: str = 'keyword') -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}. (Caution: Unreliable)")
+    def search(self, query: str, limit: int = 5, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}. (Caution: Unreliable)")
         
-        cached_results = self._get_from_cache(query, limit, search_type)
+        cached_results = self._get_from_cache(query, limit, search_type, filters)
         if cached_results:
             self.results = cached_results
             return
@@ -44,8 +45,8 @@ class GoogleScholarSearcher(BaseSearcher):
             search_query_gen = scholarly.search_pubs(search_query)
             
             for i, pub in enumerate(search_query_gen):
-                if i >= limit:
-                    self.logger.debug(f"Reached limit of {limit} results. Stopping search.")
+                if i >= limit * 2: # Fetch more to account for post-filtering
+                    self.logger.debug(f"Reached fetch limit. Stopping search.")
                     break
                 
                 self._enforce_rate_limit()
@@ -66,10 +67,27 @@ class GoogleScholarSearcher(BaseSearcher):
                     'Venue': normalize_string(pub.get('bib', {}).get('journal', '')),
                     'License Type': 'N/A'
                 }
+                
+                # Post-search filtering for year and citations
+                year = normalize_year(paper.get('bib', {}).get('pub_year'))
+                citations = normalize_citation_count(pub.get('bib', {}).get('num_citations', 'N/A'))
+
+                if filters:
+                    if filters.get('year_min') and year != 'n.d.' and int(year) < filters['year_min']:
+                        continue
+                    if filters.get('year_max') and year != 'n.d.' and int(year) > filters['year_max']:
+                        continue
+                    if filters.get('min_citations') and citations < filters['min_citations']:
+                        continue
+                
+                self.results.append(paper)
+                if len(self.results) >= limit:
+                    break
+                
                 self.logger.debug(f"Parsing paper {i+1}: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit, search_type)
+            self._save_to_cache(query, limit, search_type, filters)
             self.logger.info(f"Found and stored {len(self.results)} papers from Google Scholar.")
             
         except Exception as e:

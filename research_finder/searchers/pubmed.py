@@ -1,4 +1,5 @@
 import time
+from typing import Dict, Any
 import requests
 import xml.etree.ElementTree as ET
 from .base_searcher import BaseSearcher
@@ -43,10 +44,10 @@ class PubmedSearcher(BaseSearcher):
         
         return 0
     
-    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
-        cached_results = self._get_from_cache(query, limit, search_type)
+        cached_results = self._get_from_cache(query, limit, search_type, filters)
         if cached_results:
             self.results = cached_results
             return
@@ -61,6 +62,20 @@ class PubmedSearcher(BaseSearcher):
                 search_term = f"{query}[Author]"
             else: # Default to keyword
                 search_term = query
+            
+            # Add date range filter
+            if filters and (filters.get('year_min') or filters.get('year_max')):
+                date_range = ""
+                if filters.get('year_min'):
+                    date_range += f"{filters['year_min']}/01/01"
+                date_range += ":"
+                if filters.get('year_max'):
+                    date_range += f"{filters['year_max']}/12/31"
+                search_term += f" AND ({date_range}[Date - Publication])"
+            
+            if filters and filters.get('min_citations'):
+                self.logger.warning("PubMed API does not support direct citation count filtering. This filter will be applied post-search.")
+            
 
             # Step 1: Use esearch to get a list of PMIDs
             self._enforce_rate_limit()
@@ -162,7 +177,7 @@ class PubmedSearcher(BaseSearcher):
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
                 self.results.append(paper)
             
-            self._save_to_cache(query, limit, search_type)
+            self._save_to_cache(query, limit, search_type, filters)
             self.logger.info(f"Found and stored {len(self.results)} papers from PubMed.")
             
         except requests.exceptions.RequestException as e:
