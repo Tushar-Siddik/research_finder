@@ -60,6 +60,7 @@ def get_user_input():
     print("3. Author")
     
     search_type_map = {"1": "keyword", "2": "title", "3": "author"}
+    
     while True:
         type_choice = input("Select search type (1-3, default=1): ").strip()
         if not type_choice:

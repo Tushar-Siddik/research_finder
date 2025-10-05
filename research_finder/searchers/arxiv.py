@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from typing import Dict, Any
 sys.path.append(str(Path(__file__).parent.parent.parent))
 import requests
 import feedparser
@@ -18,7 +19,7 @@ class ArxivSearcher(BaseSearcher):
         self.logger.info(f"arXiv searcher initialized with rate limit: {self.rate_limit} req/s")
 
     
-    def search(self, query: str, limit: int = 10, search_type: str = 'keyword') -> None:
+    def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
         self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
         
         cached_results = self._get_from_cache(query, limit, search_type)

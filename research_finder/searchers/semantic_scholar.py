@@ -22,7 +22,7 @@ class SemanticScholarSearcher(BaseSearcher):
             self.rate_limit = SEMANTIC_SCHOLAR_RATE_LIMIT_NO_KEY
 
     def search(self, query: str, limit: int = 10, search_type: str = 'keyword', filters: Dict[str, Any] = None) -> None:
-        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type}")
+        self.logger.info(f"Searching for: '{query}' with limit {limit} by {search_type} with filters: {filters}")
         
         cached_results = self._get_from_cache(query, limit, search_type, filters)
         if cached_results:
