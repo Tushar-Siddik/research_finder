@@ -81,8 +81,15 @@ def _to_sentence_case(text: str) -> str:
         # Add the delimiter back if it exists.
         if i + 1 < len(parts):
             capitalized_parts.append(parts[i+1])
+            # Add a space after punctuation for readability
+            capitalized_parts.append(' ')
             
-    return "".join(capitalized_parts)
+    # Remove trailing space if exists
+    result = "".join(capitalized_parts)
+    if result.endswith(' '):
+        result = result[:-1]
+            
+    return result
 
 def _to_title_case(text: str) -> str:
     """Converts a string to title case, following APA 7 style for journal titles."""
@@ -119,17 +126,18 @@ def _parse_venue_info(venue_str: str) -> dict:
         pages = pages_match.group(1)
         venue_str = venue_str.replace(pages_match.group(0), '', 1).strip()
 
-    # Extract issue (e.g., "(6)", ":23").
-    issue_match = re.search(r'[\(,:]\s*(\d+)[\)\:]?', venue_str)
-    if issue_match:
-        issue = issue_match.group(1)
-        venue_str = venue_str.replace(issue_match.group(0), '', 1).strip()
-
-    # Extract volume (e.g., "13", "589").
-    volume_match = re.search(r'\b(\d+)\b', venue_str)
-    if volume_match:
-        volume = volume_match.group(1)
-        venue_str = venue_str.replace(volume_match.group(0), '', 1).strip()
+    # Extract volume and issue (e.g., "13(6)" or "13, 6")
+    volume_issue_match = re.search(r'(\d+)\s*[\(,]\s*(\d+)[\)\,]?', venue_str)
+    if volume_issue_match:
+        volume = volume_issue_match.group(1)
+        issue = volume_issue_match.group(2)
+        venue_str = venue_str.replace(volume_issue_match.group(0), '', 1).strip()
+    else:
+        # Extract just volume (e.g., "13")
+        volume_match = re.search(r'\b(\d+)\b', venue_str)
+        if volume_match:
+            volume = volume_match.group(1)
+            venue_str = venue_str.replace(volume_match.group(0), '', 1).strip()
 
     # Whatever is left is likely the journal name.
     journal = _to_title_case(venue_str.strip(' ,:'))
@@ -156,47 +164,127 @@ def format_apa7(paper: dict) -> str:
     """
     # 1. Format Authors
     raw_authors = paper.get('Authors', '')
-    author_names = [name.strip() for name in clean_author_list(raw_authors).split(',') if name.strip()]
-
-    if not author_names or author_names == ['N/A']:
-        authors_str = "n.a."
-    else:
-        formatted_authors = []
-        for name in author_names:
-            parts = name.split()
-            if not parts:
-                continue
-            last_name = parts[-1]
-            first_middle = ' '.join(parts[:-1])
+    
+    # First, check if the input is already in APA format with multiple "Last, F." pairs
+    def parse_apa_formatted_authors(author_str):
+        """Parse author string that may already be in APA format."""
+        if not isinstance(author_str, str):
+            return None
             
-            initials = []
-            for part in first_middle.split():
-                initials.append(part[0].upper() + '.')
+        # Split by comma and look for "Last, F." patterns
+        parts = [part.strip() for part in author_str.split(',') if part.strip()]
+        
+        # We need an even number of parts for "Last, F." pairs
+        if len(parts) % 2 != 0:
+            return None
             
-            formatted_authors.append(f"{last_name}, {' '.join(initials)}")
-
-        # Apply APA 7 joining rules.
-        num_authors = len(formatted_authors)
+        # Try to group into "Last, F." pairs
+        authors = []
+        for i in range(0, len(parts), 2):
+            if i + 1 < len(parts):
+                last_name = parts[i]
+                initials = parts[i + 1]
+                # Check if initials part looks like APA initials (ends with dots)
+                if all(part.endswith('.') for part in initials.split() if part):
+                    authors.append(f"{last_name}, {initials}")
+                else:
+                    return None
+            else:
+                return None
+                
+        return authors if authors else None
+    
+    # Try to parse as already-formatted APA authors first
+    pre_formatted_authors = parse_apa_formatted_authors(raw_authors)
+    
+    if pre_formatted_authors:
+        # Apply APA joining rules to the pre-formatted authors
+        num_authors = len(pre_formatted_authors)
         if num_authors == 1:
-            authors_str = formatted_authors[0]
+            authors_str = pre_formatted_authors[0]
         elif num_authors <= 20:
-            authors_str = ', '.join(formatted_authors[:-1]) + ', & ' + formatted_authors[-1]
-        else: # Rule for >20 authors.
-            authors_str = ', '.join(formatted_authors[:19]) + ', ... ' + formatted_authors[-1]
+            authors_str = ', '.join(pre_formatted_authors[:-1]) + ', & ' + pre_formatted_authors[-1]
+        else:
+            authors_str = ', '.join(pre_formatted_authors[:19]) + ', ... ' + pre_formatted_authors[-1]
+    else:
+        # Process authors through normal cleaning and formatting
+        author_names = [name.strip() for name in clean_author_list(raw_authors).split(',') if name.strip()]
+
+        if not author_names or author_names == ['N/A']:
+            authors_str = "n.a."
+        else:
+            formatted_authors = []
+            for name in author_names:
+                # Handle names that are already in "Last, F." format
+                if ', ' in name and len(name.split(', ')) == 2:
+                    last_part, first_part = name.split(', ')
+                    if len(first_part) <= 5 and all(part.endswith('.') for part in first_part.split()):
+                        formatted_authors.append(name)
+                        continue
+                    
+                parts = name.split()
+                if not parts:
+                    continue
+                    
+                # Handle numeric names like "Author 1", "Author 2" etc.
+                if len(parts) > 1 and parts[-1].isdigit():
+                    last_name = f"{parts[-2]} {parts[-1]}"
+                    # For numeric names, use the first letter of the first word as initial
+                    if parts[0]:
+                        initial = parts[0][0].upper() + '.'
+                        formatted_authors.append(f"{last_name}, {initial}")
+                    else:
+                        formatted_authors.append(last_name)
+                else:
+                    # Regular name processing
+                    last_name = parts[-1]
+                    first_middle = ' '.join(parts[:-1])
+                    
+                    # Extract initials
+                    initials = []
+                    for part in first_middle.split():
+                        if part:
+                            initials.append(part[0].upper() + '.')
+                    
+                    if initials:
+                        formatted_authors.append(f"{last_name}, {' '.join(initials)}")
+                    else:
+                        # No first/middle names found, use first letter of last name as initial
+                        if last_name:
+                            initial = last_name[0].upper() + '.'
+                            formatted_authors.append(f"{last_name}, {initial}")
+                        else:
+                            formatted_authors.append(last_name)
+
+            # Apply APA 7 joining rules
+            num_authors = len(formatted_authors)
+            if num_authors == 1:
+                authors_str = formatted_authors[0]
+            elif num_authors <= 20:
+                authors_str = ', '.join(formatted_authors[:-1]) + ', & ' + formatted_authors[-1]
+            else:
+                authors_str = ', '.join(formatted_authors[:19]) + ', ... ' + formatted_authors[-1]
 
     # 2. Format Year
     year = paper.get('Year', 'n.d.')
     year_str = f"({year})."
 
     # 3. Format Title (Sentence Case)
-    title = _to_sentence_case(paper.get('Title', ''))
-    # Only add a period if the title doesn't already end with one.
-    if not title.endswith('.'):
+    title = paper.get('Title', '')
+    title_ends_with_period = title.endswith('.')
+    
+    # Only apply sentence case if the title appears to be in lowercase
+    if title and title.islower():
+        title = _to_sentence_case(title)
+    else:
+        title = title.strip()
+    
+    if not title_ends_with_period:
         title_str = f"{title}."
     else:
         title_str = title
 
-    # 4. Format Journal, Volume, Issue, Pages
+    # 4. Format Journal, Volume, Issue, Pages - with proper APA punctuation
     venue_info = _parse_venue_info(paper.get('Venue', ''))
     journal_str = venue_info['journal']
     volume_str = venue_info['volume']
@@ -205,15 +293,25 @@ def format_apa7(paper: dict) -> str:
 
     source_parts = []
     if journal_str != 'N/A':
-        source_parts.append(f"*{journal_str}*") # Italicize journal name.
+        source_parts.append(f"*{journal_str}*")
+    
+    # Handle volume, issue, and pages with proper APA formatting
     if volume_str != 'N/A':
-        source_parts.append(f"*{volume_str}*")   # Italicize volume.
-    if issue_str != 'N/A':
-        source_parts.append(f"({issue_str})")
-    if pages_str != 'N/A':
+        volume_part = f"*{volume_str}*"
+        if issue_str != 'N/A':
+            volume_part += f"({issue_str})"
+        source_parts.append(volume_part)
+        
+        if pages_str != 'N/A':
+            source_parts.append(pages_str)
+    elif pages_str != 'N/A':
         source_parts.append(pages_str)
     
-    source_str = ', '.join(source_parts) + '.'
+    # Join source parts with proper punctuation
+    if source_parts:
+        source_str = ', '.join(source_parts) + '.'
+    else:
+        source_str = ''
 
     # 5. Format DOI
     doi = paper.get('DOI', '')
@@ -224,8 +322,10 @@ def format_apa7(paper: dict) -> str:
         else:
             doi_str = f"https://doi.org/{doi}"
 
-    # 6. Assemble the final reference.
-    ref_parts = [authors_str, year_str, title_str, source_str]
+    # 6. Assemble the final reference
+    ref_parts = [authors_str, year_str, title_str]
+    if source_str:
+        ref_parts.append(source_str)
     if doi_str:
         ref_parts.append(doi_str)
     
@@ -254,6 +354,7 @@ def normalize_string(text: str) -> str:
     # Strip common prefixes from titles (e.g., "Author response for").
     prefixes_to_strip = [
         "Author response for ",
+        "Correction to:",
         "Correction to ",
         "Retraction of ",
         "Expression of Concern: ",
@@ -282,9 +383,9 @@ def normalize_year(year_input) -> str:
         year_input: The year, which can be an int, string, or part of a larger string.
         
     Returns:
-        A four-digit year string, or 'n.d.' if no valid year is found.
+        A four-digit year string, or 'N/A' if no valid year is found.
     """
-    if not year_input or str(year_input).lower() == 'n/a':
+    if not year_input or str(year_input).lower() in ['n/a', 'n.a.']:
         return 'N/A'
     # Look for a standard 4-digit year in the 20th or 21st century.
     match = re.search(r'\b(19|20)\d{2}\b', str(year_input))
