@@ -24,3 +24,7 @@ tqdm
 
 # Required by pandas for writing to .xlsx Excel files
 openpyxl
+
+# For testing
+pytest
+pytest-mock
