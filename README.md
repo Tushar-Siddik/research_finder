@@ -154,7 +154,6 @@ research_finder/
 │   ├── __init__.py
 │   ├── aggregator.py       # Coordinates searches across sources
 │   ├── cache.py            # Caching functionality
-│   ├── config.py           # Configuration settings
 │   ├── exporter.py         # Export functionality
 │   ├── utils.py            # Utility functions
 │   ├── validator.py        # Configuration validation
@@ -168,9 +167,11 @@ research_finder/
 │       ├── pubmed.py
 │       └── semantic_scholar.py
 ├── tests/                  # Test suite
+├── config.py               # Configuration settings
+├── LICENSE                 # MIT License
 ├── main.py                 # Main entry point
-├── requirements.txt        # Dependencies
-└── README.md               # This file
+├── README.md               # This file
+└── requirements.txt        # Dependencies
 ```
 
 ## API Keys and Rate Limits
