@@ -65,6 +65,7 @@ class SemanticScholarSearcher(BaseSearcher):
         elif search_type == 'author':
             api_query = f'author:"{query}"' # Search within author field.
         
+        # Use only supported fields in the request
         params = {
             'query': api_query,
             'limit': limit,
@@ -127,6 +128,10 @@ class SemanticScholarSearcher(BaseSearcher):
                 if open_access_pdf:
                     license_info = normalize_string(open_access_pdf.get('license'))
 
+                # Build venue information with just the venue name
+                # Semantic Scholar API doesn't provide volume, issue, and pages in the search results
+                venue = normalize_string(item.get('venue', 'N/A'))
+
                 # Standardize the paper data into the common format.
                 paper = {
                     'Title': normalize_string(item.get('title')),
@@ -136,7 +141,7 @@ class SemanticScholarSearcher(BaseSearcher):
                     'Source': self.name,
                     'Citation Count': normalize_citation_count(item.get('citationCount', 0)),
                     'DOI': validate_doi(doi),
-                    'Venue': normalize_string(item.get('venue')),
+                    'Venue': venue,
                     'License Type': license_info
                 }
                 self.logger.debug(f"Parsing paper: '{paper['Title'][:50]}...'")
